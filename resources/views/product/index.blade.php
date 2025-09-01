@@ -313,7 +313,7 @@
                         data: 'brand',
                         name: 'brands.name'
                     },
-                      { data: 'rack', name: 'rack', visible: false, defaultContent: '' },
+                      { data: 'rack', name: 'rack', visible: false, defaultContent: '', searchable: false  },
                     {
                         data: 'tax',
                         name: 'tax_rates.name',

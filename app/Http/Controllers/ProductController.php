@@ -133,7 +133,7 @@ class ProductController extends Controller
                        $q->where('product_locations.location_id', $location_id);
                    });
                } else {
-                   // user tidak diizinkan lihat lokasi tsb → kosongkan hasil
+                   // user tidak diizinkan lihat lokasi tsb → kosongkan hasil siappp
                    $query->whereRaw('0=1');
                }
 
