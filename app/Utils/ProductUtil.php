@@ -1649,38 +1649,109 @@ class ProductUtil extends Util
         if (! empty($search_term)) {
 
             //Search with like condition
-            if ($search_type == 'like') {
-                $query->where(function ($query) use ($search_term, $search_fields) {
-                    if (in_array('name', $search_fields)) {
-                        $query->where('products.name', 'like', '%'.$search_term.'%');
-                    }
+            // if ($search_type == 'like') {
+            //     $query->where(function ($query) use ($search_term, $search_fields) {
+            //         if (in_array('name', $search_fields)) {
+            //             $query->where('products.name', 'like', '%'.$search_term.'%');
+            //         }
 
-                    if (in_array('sku', $search_fields)) {
-                        $query->orWhere('sku', 'like', '%'.$search_term.'%');
-                    }
+            //         if (in_array('sku', $search_fields)) {
+            //             $query->orWhere('sku', 'like', '%'.$search_term.'%');
+            //         }
 
-                    if (in_array('sub_sku', $search_fields)) {
-                        $query->orWhere('sub_sku', 'like', '%'.$search_term.'%');
-                    }
+            //         if (in_array('sub_sku', $search_fields)) {
+            //             $query->orWhere('sub_sku', 'like', '%'.$search_term.'%');
+            //         }
 
-                    if (in_array('lot', $search_fields)) {
-                        $query->orWhere('pl.lot_number', 'like', '%'.$search_term.'%');
-                    }
+            //         if (in_array('lot', $search_fields)) {
+            //             $query->orWhere('pl.lot_number', 'like', '%'.$search_term.'%');
+            //         }
 
-                    if (in_array('product_custom_field1', $search_fields)) {
-                        $query->orWhere('product_custom_field1', 'like', '%'.$search_term.'%');
-                    }
-                    if (in_array('product_custom_field2', $search_fields)) {
-                        $query->orWhere('product_custom_field2', 'like', '%'.$search_term.'%');
-                    }
-                    if (in_array('product_custom_field3', $search_fields)) {
-                        $query->orWhere('product_custom_field3', 'like', '%'.$search_term.'%');
-                    }
-                    if (in_array('product_custom_field4', $search_fields)) {
-                        $query->orWhere('product_custom_field4', 'like', '%'.$search_term.'%');
-                    }
-                });
-            }
+            //         if (in_array('product_custom_field1', $search_fields)) {
+            //             $query->orWhere('product_custom_field1', 'like', '%'.$search_term.'%');
+            //         }
+            //         if (in_array('product_custom_field2', $search_fields)) {
+            //             $query->orWhere('product_custom_field2', 'like', '%'.$search_term.'%');
+            //         }
+            //         if (in_array('product_custom_field3', $search_fields)) {
+            //             $query->orWhere('product_custom_field3', 'like', '%'.$search_term.'%');
+            //         }
+            //         if (in_array('product_custom_field4', $search_fields)) {
+            //             $query->orWhere('product_custom_field4', 'like', '%'.$search_term.'%');
+            //         }
+            //     });
+            // }
+
+             // === Include search ===
+       if (! empty($search_term)) {
+           // LIKE mode: unordered multi-keyword (AND antar kata, OR antar kolom)
+           if ($search_type == 'like') {
+               $query->where(function ($q) use ($search_term, $search_fields) {
+                   // default kolom jika tidak dikirim dari frontend
+                   $lookups = !empty($search_fields) ? $search_fields : ['name','sku','sub_sku'];
+                   // pastikan sub_sku ikut jika sku diminta
+                   if (in_array('sku', $lookups) && !in_array('sub_sku', $lookups)) {
+                       $lookups[] = 'sub_sku';
+                   }
+                   // pecah input jadi token per spasi
+                   $terms = array_filter(preg_split('/\s+/', trim($search_term)));
+                   foreach ($terms as $t) {
+                       // escape wildcard LIKE
+                       $t = str_replace(['\\','%','_'], ['\\\\','\%','\_'], $t);
+                       $like = "%{$t}%";
+                       // setiap kata -> wajib match di salah satu field
+                       $q->where(function ($qq) use ($like, $lookups) {
+                           foreach ($lookups as $field) {
+                               switch ($field) {
+                                   case 'name':
+                                       $qq->orWhere('products.name', 'like', $like);
+                                       break;
+                                   case 'sku':
+                                       $qq->orWhere('products.sku', 'like', $like);
+                                       break;
+                                   case 'sub_sku':
+                                       $qq->orWhere('variations.sub_sku', 'like', $like);
+                                       break;
+                                   case 'lot':
+                                       $qq->orWhere('pl.lot_number', 'like', $like);
+                                       break;
+                                   case 'product_custom_field1':
+                                       $qq->orWhere('products.product_custom_field1', 'like', $like);
+                                       break;
+                                   case 'product_custom_field2':
+                                       $qq->orWhere('products.product_custom_field2', 'like', $like);
+                                       break;
+                                   case 'product_custom_field3':
+                                       $qq->orWhere('products.product_custom_field3', 'like', $like);
+                                       break;
+                                   case 'product_custom_field4':
+                                       $qq->orWhere('products.product_custom_field4', 'like', $like);
+                                       break;
+                               }
+                           }
+                       });
+                   }
+               });
+           }
+
+           // EXACT mode: perbaiki kwalifikasi kolom
+           if ($search_type == 'exact') {
+               $query->where(function ($query) use ($search_term, $search_fields) {
+                   if (in_array('name', $search_fields)) {
+                       $query->where('products.name', $search_term);
+                   }
+                   if (in_array('sku', $search_fields)) {
+                       $query->orWhere('products.sku', $search_term);
+                   }
+                   if (in_array('sub_sku', $search_fields)) {
+                       $query->orWhere('variations.sub_sku', $search_term);
+                   }
+                   if (in_array('lot', $search_fields)) {
+                       $query->orWhere('pl.lot_number', $search_term);
+                   }
+               });
+           }
+       }
 
             //Search with exact condition
             if ($search_type == 'exact') {
