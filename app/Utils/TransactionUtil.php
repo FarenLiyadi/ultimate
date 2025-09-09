@@ -1312,6 +1312,39 @@ class TransactionUtil extends Util
             $output['tax_summary_label'] = $il->common_settings['tax_summary_label'] ?? '';
             $details = $this->_receiptDetailsSellLines($lines, $il, $business_details);
 
+            // ==== Inject rack info (SELL / SALES ORDER) ====
+$variationToProduct = [];
+foreach ($lines as $sl) {
+    // $lines adalah koleksi sell_lines yang sudah kamu ambil sebelumnya
+    $variationToProduct[$sl->variation_id] = $sl->product_id;
+}
+
+$productIds = array_values(array_unique($variationToProduct));
+
+// ambil mapping rack berdasarkan product & lokasi nota
+$rackMap = DB::table('product_racks')
+    ->where('business_id', $business_details->id)
+    ->where('location_id', $location_id) // atau $transaction->location_id
+    ->whereIn('product_id', $productIds)
+    ->get()
+    ->keyBy('product_id');
+
+// sisipkan ke masing-masing line (berdasar variation_id -> product_id)
+foreach ($details['lines'] as &$dl) {
+    if (!empty($dl['variation_id'])) {
+        $pid = $variationToProduct[$dl['variation_id']] ?? null;
+        if ($pid && isset($rackMap[$pid])) {
+            $dl['rack']     = $rackMap[$pid]->rack;
+            $dl['row']      = $rackMap[$pid]->row;
+            $dl['position'] = $rackMap[$pid]->position;
+        }
+    }
+}
+unset($dl);
+
+// $output['lines'] = $details['lines'];
+// ==== /Inject rack info ====
+
             $output['lines'] = $details['lines'];
             $output['taxes'] = [];
             $total_quantity = 0;
@@ -1347,6 +1380,10 @@ class TransactionUtil extends Util
                 }
             }
 
+            
+                // $output['total_quantity_label'] = $il->common_settings['total_quantity_label'];
+                // $output['total_quantity'] = $this->num_f($total_quantity, false, $business_details, true);
+            
             if (! empty($il->common_settings['total_quantity_label'])) {
                 $output['total_quantity_label'] = $il->common_settings['total_quantity_label'];
                 $output['total_quantity'] = $this->num_f($total_quantity, false, $business_details, true);
@@ -1356,6 +1393,9 @@ class TransactionUtil extends Util
                 $output['total_items_label'] = $il->common_settings['total_items_label'];
                 $output['total_items'] = count($unique_items);
             }
+        
+                
+            
 
             $output['subtotal_exc_tax'] = $this->num_f($subtotal_exc_tax, true, $business_details);
             $output['total_line_discount'] = ! empty($total_line_discount) ? $this->num_f($total_line_discount, true, $business_details) : 0;

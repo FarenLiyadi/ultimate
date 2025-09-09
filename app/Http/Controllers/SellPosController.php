@@ -620,7 +620,8 @@ class SellPosController extends Controller
                 if ($request->input('is_save_and_print') == 1) {
                     $url = $this->transactionUtil->getInvoiceUrl($transaction->id, $business_id);
 
-                    return redirect()->to($url . '?print_on_load=true');
+                    return redirect()->to($url . '?print_on_load=true&package_slip=' . $transaction->id);
+                   
                 }
 
                 $msg = trans('sale.pos_sale_added');
@@ -1461,7 +1462,7 @@ class SellPosController extends Controller
                 if ($request->input('is_save_and_print') == 1) {
                     $url = $this->transactionUtil->getInvoiceUrl($id, $business_id);
 
-                    return redirect()->to($url . '?print_on_load=true');
+                    return redirect()->to($url . '?print_on_load=true&package_slip=' . $transaction->id);
                 }
 
                 $msg = __('lang_v1.updated_success');

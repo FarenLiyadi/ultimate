@@ -940,18 +940,22 @@ class PurchaseController extends Controller
                 return json_encode([]);
             }
 
+            // ⬇️ Pecah term jadi token per spasi, buang yang kosong
+            $tokens = array_values(array_filter(preg_split('/\s+/u', $term)));
+
             $business_id = request()->session()->get('user.business_id');
-            $q = Product::leftJoin(
-                'variations',
-                'products.id',
-                '=',
-                'variations.product_id'
-            )
-                ->where(function ($query) use ($term) {
-                    $query->where('products.name', 'like', '%'.$term.'%');
-                    $query->orWhere('sku', 'like', '%'.$term.'%');
-                    $query->orWhere('sub_sku', 'like', '%'.$term.'%');
-                })
+            $q = Product::leftJoin('variations', 'products.id', '=', 'variations.product_id')
+    ->where(function ($outer) use ($tokens) {
+        foreach ($tokens as $tk) {
+            $outer->where(function ($inner) use ($tk) {
+                $like = '%'.$tk.'%';
+                $inner->where('products.name', 'like', $like)
+                      ->orWhere('sku', 'like', $like)
+                      ->orWhere('sub_sku', 'like', $like)
+                      ->orWhere('variations.name', 'like', $like); // cari juga di nama variasi
+            });
+        }
+    })
                 ->active()
                 ->where('business_id', $business_id)
                 ->whereNull('variations.deleted_at')

@@ -409,7 +409,7 @@
     </div>
   </div>
   <div class="modal-footer">
-    @if($sell->type != 'sales_order')
+    @if($sell->type = 'sales_order')
     <a href="#" class="print-invoice tw-dw-btn tw-dw-btn-success tw-text-white" data-href="{{route('sell.printInvoice', [$sell->id])}}?package_slip=true"><i class="fas fa-file-alt" aria-hidden="true"></i> @lang("lang_v1.packing_slip")</a>
     @endif
     @can('print_invoice')

@@ -231,8 +231,8 @@
 	        <!-- customer info -->
 	        <div class="textbox-info">
 	        	<p style="vertical-align: top;"><strong>
-	        		{{$receipt_details->customer_label ?? ''}}
-	        	</strong></p>
+	        		{{$receipt_details->customer_label ?? ''}} :
+	        	</strong>  </p>
 
 	        	<p>
 	        		@if(!empty($receipt_details->customer_info))
@@ -242,6 +242,12 @@
 					@endif
 	        	</p>
 	        </div>
+			{{-- <div class="textbox-info">
+				<p class="f-left"><strong>{{$receipt_details->customer_label ?? ''}}</strong></p>
+				<p class="f-right">
+					{!! $receipt_details->customer_info !!}
+				</p>
+			</div> --}}
 			
 			@if(!empty($receipt_details->client_id_label))
 				<div class="textbox-info">

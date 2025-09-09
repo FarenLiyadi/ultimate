@@ -64,6 +64,8 @@
                         <th>@lang('restaurant.order_no')</th>
                         <th>@lang('sale.customer_name')</th>
                         <th>@lang('lang_v1.contact_no')</th>
+                        <th>@lang('sale.total_amount')</th>
+                        <th>@lang('sale.total_paid')</th>
                         <th>@lang('sale.location')</th>
                         <th>@lang('sale.status')</th>
                         <th>@lang('lang_v1.shipping_status')</th>
@@ -137,6 +139,15 @@ $(document).ready( function(){
             { data: 'invoice_no', name: 'invoice_no'},
             { data: 'conatct_name', name: 'conatct_name'},
             { data: 'mobile', name: 'contacts.mobile'},
+             {
+                        data: 'final_total',
+                        name: 'final_total'
+                    },
+             {
+                        data: 'total_paid',
+                        name: 'total_paid',
+                        "searchable": false
+                    },
             { data: 'business_location', name: 'bl.name'},
             { data: 'status', name: 'status'},
             { data: 'shipping_status', name: 'shipping_status'},

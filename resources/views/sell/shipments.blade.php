@@ -136,6 +136,7 @@
 @stop
 
 @section('javascript')
+
 <script type="text/javascript">
 $(document).ready( function(){
     //Date range as a button
@@ -185,7 +186,16 @@ $(document).ready( function(){
                 d.only_shipments = true;
                 d.shipping_status = $('#shipping_status').val();
                 d.delivery_person = $('#delivery_person').val();
-            }
+                // 👉 Lihat parameter yang DIKIRIM
+                // console.log('[SELLS] request params:', d);
+            },
+//             "dataSrc": function (json) {
+//     console.log('[SELLS] response JSON (full):', json);
+//     if (json && json.data) console.table(json.data);
+//     // kembalikan data ke DataTables seperti biasa
+//     return json.data || json;
+//   }
+             
         },
         columns: [
             { data: 'action', name: 'action', searchable: false, orderable: false},
@@ -226,6 +236,10 @@ $(document).ready( function(){
         sell_table.ajax.reload();
     });
 });
+$('#sell_table').on('xhr.dt', function (e, settings, json) {
+  console.log('Action cells:', json.data.map(r => r.action));
+});
 </script>
 <script src="{{ asset('js/payment.js?v=' . $asset_v) }}"></script>
+
 @endsection
