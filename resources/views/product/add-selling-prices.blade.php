@@ -5,12 +5,15 @@
 
 <!-- Content Header (Page header) -->
 <section class="content-header">
-    <h1 class="tw-text-xl md:tw-text-3xl tw-font-bold tw-text-black">@lang('lang_v1.add_selling_price_group_prices')</h1>
+    <h1 class="tw-text-xl md:tw-text-2xl tw-font-bold tw-text-black">Edit Harga Jual</h1>
+    <h1 class="tw-text-xl md:tw-text-xl tw-font-bold tw-text-black"> {{$product->name}} ({{$product->sku}})</h1>
+	
 </section>
 
 <!-- Main content -->
 <section class="content">
-	{!! Form::open(['url' => action([\App\Http\Controllers\ProductController::class, 'saveSellingPrices']), 'method' => 'post', 'id' => 'selling_price_form' ]) !!}
+	{{-- {!! Form::open(['url' => action([\App\Http\Controllers\ProductController::class, 'saveSellingPrices']), 'method' => 'post', 'id' => 'selling_price_form' ]) !!}
+	
 	{!! Form::hidden('product_id', $product->id); !!}
 	<div class="row">
 		<div class="col-xs-12">
@@ -85,10 +88,24 @@
 		</div>
 	</div>
 
-	{!! Form::close() !!}
+	{!! Form::close() !!} --}}
+	<form action="{{ route('products.pricing.save', $product->id) }}" method="POST">
+  @csrf
+
+  {{-- Section: Harga per Satuan --}}
+  @include('product.partials.variation_unit_prices')   {{-- TANPA <form> di dalam file ini --}}
+	<hr>
+<div style="margin-bottom: 16px"></div>
+  {{-- Section: Diskon Qty per Satuan --}}
+  @include('product.partials.qty_pricing_rules', ['price_groups' => $price_groups_dropdown])      {{-- TANPA <form> di dalam file ini --}}
+
+  <div class="mt-3 text-end">
+    <button type="submit" class="btn btn-primary">Simpan Semua</button>
+  </div>
+</form>   
 </section>
 @stop
-@section('javascript')
+{{-- @section('javascript')
 	<script type="text/javascript">
 		$(document).ready(function(){
 			$('button.submit_form').click( function(e){
@@ -101,4 +118,4 @@
 			});
 		});
 	</script>
-@endsection
+@endsection --}}

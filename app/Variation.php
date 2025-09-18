@@ -59,6 +59,10 @@ class Variation extends Model
         return $this->hasMany(\App\VariationGroupPrice::class, 'variation_id');
     }
 
+    public function unitPrices(){
+    return $this->hasMany(\App\VariationUnitPrice::class, 'variation_id');
+    }
+
     public function media()
     {
         return $this->morphMany(\App\Media::class, 'model');

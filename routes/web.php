@@ -36,6 +36,9 @@ use App\Http\Controllers\NotificationTemplateController;
 use App\Http\Controllers\OpeningStockController;
 use App\Http\Controllers\PrinterController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductPricingController;
+use App\Http\Controllers\ProductQtyPricingRuleController;
+use App\Http\Controllers\ProductVariationUnitPriceController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseRequisitionController;
@@ -99,6 +102,12 @@ Route::middleware(['setData'])->group(function () {
 
 //Routes for authenticated users only
 Route::middleware(['setData', 'auth', 'SetSessionData', 'language', 'timezone', 'AdminSidebarMenu', 'CheckUserLogin'])->group(function () {
+// custom
+Route::post('/products/{product}/pricing/save',
+        [ProductPricingController::class, 'store']
+    )->name('products.pricing.save');
+
+
     Route::get('pos/payment/{id}', [SellPosController::class, 'edit'])->name('edit-pos-payment');
     Route::get('service-staff-availability', [SellPosController::class, 'showServiceStaffAvailibility']);
     Route::get('pause-resume-service-staff-timer/{user_id}', [SellPosController::class, 'pauseResumeServiceStaffTimer']);
