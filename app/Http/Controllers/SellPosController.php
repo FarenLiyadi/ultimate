@@ -63,6 +63,11 @@ use Stripe\Charge;
 use Stripe\Stripe;
 use Yajra\DataTables\Facades\DataTables;
 use App\Events\SellCreatedOrModified;
+use App\VariationUnitPrice;
+use App\QtyPricingRule;
+use App\VariationGroupPrice;
+use App\VariationLocationDetails;
+
 
 class SellPosController extends Controller
 {
@@ -1662,6 +1667,38 @@ class SellPosController extends Controller
         }
 
         $product = $this->productUtil->getDetailsFromVariation($variation_id, $business_id, $location_id, $check_qty);
+        // ===============================================
+        // MULTI UNIT PRICE
+        // ===============================================
+        $unit_prices = VariationUnitPrice::where('variation_id', $variation_id)->get();
+     
+
+
+        // ===============================================
+        // QTY TIER PRICING RULES
+        // ===============================================
+        $qty_rules = QtyPricingRule::where('variation_id', $variation_id)->get();
+
+        // ===============================================
+        // PRICE GROUP CUSTOMER
+        // ===============================================
+        $price_group_prices = [];
+        $price_group_id = request()->input('price_group');
+
+        if (!empty($price_group_id)) {
+            $price_group_prices = VariationGroupPrice::where('variation_id', $variation_id)
+                ->where('price_group_id', $price_group_id)
+                ->get();
+        }
+
+        // ===============================================
+        // LOCATION PRICE OVERRIDE
+        // ===============================================
+        $location_prices = VariationLocationDetails::where('variation_id', $variation_id)
+            ->where('location_id', $location_id)
+            ->first();
+
+
 
         if (!isset($product->quantity_ordered)) {
             $product->quantity_ordered = $quantity;
@@ -1740,10 +1777,33 @@ class SellPosController extends Controller
                 $edit_price = auth()->user()->can('edit_product_price_from_pos_screen');
             }
 
-            $output['html_content'] = view('sale_pos.product_row')
-                ->with(compact('product', 'row_count', 'tax_dropdown', 'enabled_modules', 'pos_settings', 'sub_units', 'discount', 'waiters', 'edit_discount', 'edit_price', 'purchase_line_id', 'warranties', 'quantity', 'is_direct_sell', 'so_line', 'is_sales_order', 'last_sell_line', 'is_serial_no'))
-                ->render();
-        }
+           $output['html_content'] = view('sale_pos.product_row')
+    ->with(compact(
+        'product',
+        'row_count',
+        'tax_dropdown',
+        'enabled_modules',
+        'pos_settings',
+        'sub_units',
+        'discount',
+        'waiters',
+        'edit_discount',
+        'edit_price',
+        'purchase_line_id',
+        'warranties',
+        'quantity',
+        'is_direct_sell',
+        'so_line',
+        'is_sales_order',
+        'last_sell_line',
+        'is_serial_no',
+        'unit_prices',
+        'qty_rules',
+        'price_group_prices',
+        'location_prices'
+    ))
+    ->render();
+            }
 
         return $output;
     }
@@ -1806,7 +1866,18 @@ class SellPosController extends Controller
                 }
             }
 
-            $output = $this->getSellLineRow($variation_id, $location_id, $quantity, $row_count, $is_direct_sell, $is_serial_no);
+            $price_group = request()->input('price_group');
+
+$output = $this->getSellLineRow(
+    $variation_id,
+    $location_id,
+    $quantity,
+    $row_count,
+    $is_direct_sell,
+    $is_serial_no,
+    null, // so_line tetap null
+    $price_group
+);
 
             if ($this->transactionUtil->isModuleEnabled('modifiers') && !$is_direct_sell) {
                 $variation = Variation::find($variation_id);

@@ -1,4 +1,6 @@
+
 @php
+
 	$common_settings = session()->get('business.common_settings');
 	$multiplier = 1;
 
@@ -13,7 +15,12 @@
 	@endif
 @endforeach
 
-<tr class="product_row" data-row_index="{{$row_count}}" @if(!empty($so_line)) data-so_id="{{$so_line->transaction_id}}" @endif>
+<tr class="product_row" 
+	    data-unit_prices='@json($unit_prices ?? [])'
+    data-qty_rules='@json($qty_rules ?? [])'
+    data-price_group_prices='@json($price_group_prices ?? [])'
+    data-location_prices='@json($location_prices ?? [])'
+	data-row_index="{{$row_count}}" @if(!empty($so_line)) data-so_id="{{$so_line->transaction_id}}" @endif>
 	@if(!empty($is_serial_no))
 		<td class="serial_no" ></td>
 	@endif
@@ -416,4 +423,10 @@
 	<td class="text-center v-center">
 		<i class="fa fa-times text-danger pos_remove_row cursor-pointer" aria-hidden="true"></i>
 	</td>
+	<input type="hidden" class="unit_prices_json" value='@json($unit_prices ?? [])'>
+<input type="hidden" class="qty_rules_json" value='@json($qty_rules ?? [])'>
+<input type="hidden" class="price_group_prices_json" value='@json($price_group_prices ?? [])'>
+<input type="hidden" class="location_prices_json" value='@json($location_prices ?? [])'>
+
+
 </tr>

@@ -192,7 +192,7 @@
         <div class="table-responsive">
           <table class="table table-condensed table-bordered">
             <thead>
-              <tr class="bg-gray">
+              <tr class="bg-green">
                 <th style="width:180px;">@lang('product.unit')</th>
                 <th style="width:160px;">Default</th>
                 @foreach(($price_groups_dropdown ?? []) as $pgid => $pgname)
@@ -293,7 +293,7 @@
             <div class="table-responsive">
               <table class="table table-condensed table-bordered">
                 <thead>
-                  <tr class="bg-gray">
+                  <tr class="bg-green">
                     <th style="width:160px;">Price Group</th>
                     <th style="width:110px;">Min Qty</th>
                     <th style="width:160px;">Final / Unit (Inc. Tax)</th>

@@ -355,14 +355,10 @@ $(document).ready(function () {
 
     //Update line total and check for quantity not greater than max quantity
     $('table#pos_table tbody').on('change', 'input.pos_quantity', function () {
-        // comment line becouse it validate form at increment and decrement item
-        // if (sell_form_validator) {
-        //     sell_form.valid();
-        // }
         if (pos_form_validator) {
             pos_form_validator.element($(this));
         }
-        // var max_qty = parseFloat($(this).data('rule-max'));
+
         var entered_qty = __read_number($(this));
 
         var tr = $(this).parents('tr');
@@ -382,6 +378,9 @@ $(document).ready(function () {
         });
 
         pos_total_row();
+
+        // ⭐ ADD THIS → APPLY MULTI UNIT, TIER PRICE, PRICE GROUP, LOCATION
+        applyAllPricing(tr);
 
         adjustComboQty(tr);
     });
@@ -515,9 +514,10 @@ $(document).ready(function () {
         function () {
             var tr = $(this).parents('tr');
 
-            //calculate discounted unit price
-            var discounted_unit_price = calculate_discounted_unit_price(tr);
+            // LOCK manual override
+            tr.data('manual_price', 1);
 
+            var discounted_unit_price = calculate_discounted_unit_price(tr);
             var tax_rate = tr.find('select.tax_id').find(':selected').data('rate');
             var quantity = __read_number(tr.find('input.pos_quantity'));
 
@@ -1483,6 +1483,10 @@ $(document).ready(function () {
             });
             qty_element.trigger('change');
         }
+
+        // ⭐ ADD THIS — APPLY ADVANCED PRICING (MULTI UNIT, TIER, PRICE GROUP, LOCATION)
+        applyAllPricing(tr);
+
         adjustComboQty(tr);
     });
 
@@ -1810,7 +1814,7 @@ function pos_product_row(
                     $('input#product_row_count').val(parseInt(product_row) + 1);
                     var this_row = $('table#pos_table tbody').find('tr').last();
                     pos_each_row(this_row);
-
+                    applyAllPricing(this_row);
                     //For initial discount if present
                     var line_total = __read_number(this_row.find('input.pos_line_total'));
                     this_row.find('span.pos_line_total_text').text(line_total);
@@ -1881,6 +1885,59 @@ function pos_each_row(row_obj) {
     //var unit_price_inc_tax = __read_number(row_obj.find('input.pos_unit_price_inc_tax'));
 
     __write_number(row_obj.find('input.item_tax'), unit_price_inc_tax - discounted_unit_price);
+}
+function applyAllPricing(tr) {
+    if (tr.data('manual_price') == 1) {
+        return; // harga manual, jangan overwrite
+    }
+    let qty = __read_number(tr.find('.pos_quantity'));
+    let base_price = __read_number(tr.find('.hidden_base_unit_sell_price'));
+    let multiplier = parseFloat(tr.find('.sub_unit option:selected').data('multiplier')) || 1;
+    let sub_unit_id = parseInt(tr.find('.sub_unit').val()) || null;
+
+    let unit_prices = JSON.parse(tr.find('.unit_prices_json').val() || '[]');
+    let qty_rules = JSON.parse(tr.find('.qty_rules_json').val() || '[]');
+
+    let final_price = null;
+
+    // Multi unit price
+    let multi = unit_prices.find((u) => parseInt(u.unit_id) === sub_unit_id);
+    let multi_price = multi ? parseFloat(multi.price_inc_tax) : null;
+
+    if (multi_price !== null) {
+        final_price = multi_price;
+    }
+
+    // QTY RULE — FILTER BY UNIT
+    let rule = qty_rules
+        .filter((r) => parseInt(r.unit_id) === sub_unit_id) // <<< FIX di sini!
+        .find((r) => qty >= parseFloat(r.min_qty));
+
+    if (rule) {
+        if (final_price === null) {
+            final_price = multi_price !== null ? multi_price : base_price * multiplier;
+        }
+
+        let disc = parseFloat(rule.discount_value) || 0;
+
+        if (rule.discount_type === 'fixed') {
+            final_price -= disc;
+        } else {
+            final_price *= 1 - disc / 100;
+        }
+    }
+
+    // Fallback
+    if (final_price === null) {
+        final_price = multi_price !== null ? multi_price : base_price * multiplier;
+    }
+
+    if (isNaN(final_price) || final_price < 0) {
+        final_price = multi_price !== null ? multi_price : base_price * multiplier;
+    }
+
+    __write_number(tr.find('.pos_unit_price_inc_tax'), final_price);
+    tr.find('.pos_unit_price_inc_tax').trigger('change');
 }
 
 function pos_total_row() {
@@ -2437,6 +2494,86 @@ $(document).on('ifChecked', '#is_recurring', function () {
 
 $(document).on('shown.bs.modal', '#recurringInvoiceModal', function () {
     $('input#recur_interval').focus();
+});
+
+function getRowData(row) {
+    return {
+        unit_prices: JSON.parse(row.attr('data-unit_prices') || '[]'),
+        qty_rules: JSON.parse(row.attr('data-qty_rules') || '[]'),
+        price_group_prices: JSON.parse(row.attr('data-price_group_prices') || '[]'),
+        location_prices: JSON.parse(row.attr('data-location_prices') || 'null'),
+    };
+}
+
+function applyMultiUnitPrice(row) {
+    let data = getRowData(row);
+    let selected_subunit = row.find('.sub_unit').val();
+
+    if (!data.unit_prices || data.unit_prices.length === 0) return;
+
+    let found = data.unit_prices.find((p) => p.sub_unit_id == selected_subunit);
+    if (found) {
+        __write_number(row.find('input.pos_unit_price_inc_tax'), found.price);
+    }
+}
+
+function applyQtyTierPrice(row) {
+    let data = getRowData(row);
+    let qty = __read_number(row.find('.pos_quantity'));
+
+    if (!data.qty_rules || data.qty_rules.length === 0) return;
+
+    let matched = null;
+
+    data.qty_rules.forEach((rule) => {
+        if (qty >= rule.min_qty) {
+            matched = rule;
+        }
+    });
+
+    if (matched) {
+        __write_number(row.find('input.pos_unit_price_inc_tax'), matched.price);
+    }
+}
+
+function applyGroupAndLocationPrice(row) {
+    let data = getRowData(row);
+
+    // price group
+    if (data.price_group_prices && data.price_group_prices.length > 0) {
+        __write_number(
+            row.find('input.pos_unit_price_inc_tax'),
+            data.price_group_prices[0].price_inc_tax
+        );
+    }
+
+    // location price override
+    if (data.location_prices && data.location_prices.sell_price_inc_tax) {
+        __write_number(
+            row.find('input.pos_unit_price_inc_tax'),
+            data.location_prices.sell_price_inc_tax
+        );
+    }
+}
+
+// qty berubah
+$('table#pos_table tbody').on('change', '.pos_quantity', function () {
+    let row = $(this).closest('tr');
+    applyAllPricing(row);
+});
+
+// sub-unit dipilih
+$('table#pos_table tbody').on('change', '.sub_unit', function () {
+    let row = $(this).closest('tr');
+    applyAllPricing(row);
+});
+
+// setiap baris produk baru dimasukkan
+$(document).on('DOMNodeInserted', '#pos_table tbody', function (e) {
+    let row = $(e.target).closest('tr');
+    if (row && row.hasClass('product_row')) {
+        applyAllPricing(row);
+    }
 });
 
 $(document).on('click', '#select_all_service_staff', function () {
