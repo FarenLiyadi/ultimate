@@ -122,11 +122,13 @@
 		@endif
 <br>
 		<small class="text-muted p-1">
-			@if($product->enable_stock)
-			{{ @num_format($product->qty_available) }} {{$product->unit}} @lang('lang_v1.in_stock')
-			@else
-				--
-			@endif
+				@if($product->product_type == 'combo')
+					{{ @num_format($product->qty_available) }} {{$product->unit}} @lang('lang_v1.in_stock')
+				@elseif($product->enable_stock)
+					{{ @num_format($product->qty_available) }} {{$product->unit}} @lang('lang_v1.in_stock')
+				@else
+					--
+				@endif
 		</small>
 
 		<!-- Description modal end -->
@@ -266,10 +268,15 @@
 			@endif
 			data-rule-required="true" 
 			data-msg-required="@lang('validation.custom-messages.this_field_is_required')" 
-			@if($product->enable_stock && empty($pos_settings['allow_overselling']) && empty($is_sales_order) )
-				data-rule-max-value="{{$max_qty_rule}}" data-qty_available="{{$product->qty_available}}" data-msg-max-value="{{$max_qty_msg}}" 
-				data-msg_max_default="@lang('validation.custom-messages.quantity_not_available', ['qty'=> $product->formatted_qty_available, 'unit' => $product->unit  ])" 
-			@endif 
+			@if( ($product->enable_stock || $product->product_type == 'combo') 
+    && empty($pos_settings['allow_overselling']) 
+    && empty($is_sales_order)
+)
+    data-rule-max-value="{{$max_qty_rule}}"
+    data-qty_available="{{$product->qty_available}}"
+    data-msg-max-value="{{$max_qty_msg}}"
+@endif
+
 		>
 		<span class="input-group-btn"><button type="button" class="btn btn-default btn-flat quantity-up"><i class="fa fa-plus text-success"></i></button></span>
 		</div>

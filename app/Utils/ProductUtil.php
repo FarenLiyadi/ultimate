@@ -38,6 +38,107 @@ class ProductUtil extends Util
      * @param $combo_variations = []
      * @return bool
      */
+  public function getComboStock($variation_id, $location_id)
+{
+    // Ambil variation utama (produk combo)
+    $variation = \App\Variation::find($variation_id);
+
+    // Jika tidak ada variation atau tidak ada data combo → stok 0
+    if (!$variation || empty($variation->combo_variations)) {
+        return 0;
+    }
+
+    // Ambil raw value dari kolom combo_variations (bisa string / array)
+    $raw = $variation->combo_variations;
+
+    // Jika sudah array (Laravel auto-cast)
+    if (is_array($raw)) {
+        $combo_items = $raw;
+    }
+    // Jika string JSON
+    elseif (is_string($raw) && trim($raw) !== '') {
+        $decoded = json_decode($raw, true);
+        $combo_items = is_array($decoded) ? $decoded : [];
+    }
+    // Jika null / kosong
+    else {
+        $combo_items = [];
+    }
+
+    // Jika tidak ada komponen → stok 0
+    if (empty($combo_items)) {
+        return 0;
+    }
+
+    // Hitung stok combo berdasarkan stok minimum item komponen
+    $combo_qty = null;
+
+    foreach ($combo_items as $item) {
+        $component_variation_id = $item['variation_id'];
+        $needed_qty = (float) $item['quantity'];
+
+        // Stok komponen di lokasi yang dipilih
+        $item_stock = \App\VariationLocationDetails::where('variation_id', $component_variation_id)
+            ->where('location_id', $location_id)
+            ->value('qty_available') ?? 0;
+
+        // Berapa combo bisa dibuat dari komponen ini?
+        $possible = floor($item_stock / $needed_qty);
+
+        // Ambil nilai terkecil
+        if ($combo_qty === null || $possible < $combo_qty) {
+            $combo_qty = $possible;
+        }
+    }
+
+    // Return stok combo final
+    return $combo_qty ?? 0;
+}
+public function getComboStockGlobal($variation_id)
+{
+    $variation = \App\Variation::find($variation_id);
+
+    if (!$variation || empty($variation->combo_variations)) {
+        return 0;
+    }
+
+    $raw = $variation->combo_variations;
+
+    if (is_array($raw)) {
+        $combo_items = $raw;
+    } elseif (is_string($raw) && trim($raw) !== '') {
+        $decoded = json_decode($raw, true);
+        $combo_items = is_array($decoded) ? $decoded : [];
+    } else {
+        $combo_items = [];
+    }
+
+    if (empty($combo_items)) {
+        return 0;
+    }
+
+    $combo_qty = null;
+
+    foreach ($combo_items as $item) {
+
+        $component_variation_id = $item['variation_id'];
+        $needed_qty = (float)$item['quantity'];
+
+        // TOTAL stok semua cabang
+        $item_stock = \App\VariationLocationDetails::where('variation_id', $component_variation_id)
+            ->sum('qty_available');
+
+        $possible = floor($item_stock / $needed_qty);
+
+        if ($combo_qty === null || $possible < $combo_qty) {
+            $combo_qty = $possible;
+        }
+    }
+
+    return $combo_qty ?? 0;
+}
+
+
     public function createSingleProductVariation($product, $sku, $purchase_price, $dpp_inc_tax, $profit_percent, $selling_price, $selling_price_inc_tax, $combo_variations = [])
     {
         if (! is_object($product)) {
@@ -1842,6 +1943,19 @@ if ($base_price_row) {
             $item->sub_sku = e($item->sub_sku);
             return $item;
         });
+
+        // --- FIX: fallback ke lokasi user jika POS tidak mengirim location_id ---
+        if (empty($location_id)) {
+            $loc = auth()->user()->permitted_locations();
+            $location_id = is_array($loc) ? reset($loc) : $loc;
+        }
+        // Hitung stok untuk produk combo
+        foreach ($data as $item) {
+            if ($item->type == 'combo') {
+                $item->qty_available = $this->getComboStock($item->variation_id, $location_id);
+            }
+        }
+
 
         return $data;
 

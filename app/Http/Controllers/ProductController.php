@@ -65,6 +65,8 @@ class ProductController extends Controller
      */
     public function index()
     {
+     
+
         if (! auth()->user()->can('product.view') && ! auth()->user()->can('product.create')) {
             abort(403, 'Unauthorized action.');
         }
@@ -333,15 +335,24 @@ class ProductController extends Controller
                 ->addColumn('mass_delete', function ($row) {
                     return  '<input type="checkbox" class="row-select" value="'.$row->id.'">';
                 })
-                ->editColumn('current_stock', function ($row) {
-                    if ($row->enable_stock) {
-                        $stock = $this->productUtil->num_f($row->current_stock, false, null, true);
+               ->editColumn('current_stock', function ($row) {
 
-                        return $stock.' '.$row->unit;
-                    } else {
-                        return '--';
-                    }
-                })
+                // Jika COMBO → tampilkan stok global (gabungan semua cabang)
+                if ($row->type == 'combo') {
+                    $variation_id = \App\Variation::where('product_id', $row->id)->value('id');
+                    $combo_stock = app('App\Utils\ProductUtil')->getComboStockGlobal($variation_id);
+                    return $combo_stock . ' ' . $row->unit;
+                }
+
+                // Produk biasa
+                if ($row->enable_stock) {
+                    $stock = $this->productUtil->num_f($row->current_stock, false, null, true);
+                    return $stock . ' ' . $row->unit;
+                }
+
+                return '--';
+            })
+
                 ->addColumn(
                     'purchase_price',
                     '<div style="white-space: nowrap;">@format_currency($min_purchase_price) @if($max_purchase_price != $min_purchase_price && $type == "variable") -  @format_currency($max_purchase_price)@endif </div>'

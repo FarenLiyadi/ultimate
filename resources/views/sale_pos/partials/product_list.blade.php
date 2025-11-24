@@ -28,8 +28,11 @@
 				({{$product->sub_sku}})
 			</small><br>
 			<small class="text-muted" style="font-size: 60%;">
-				@if($product->enable_stock)
-				{{ @num_format($product->qty_available) }} {{$product->unit}} @lang('lang_v1.in_stock')
+				
+				@if($product->type == 'combo')
+					{{ @num_format($product->qty_available) }} {{$product->unit}} @lang('lang_v1.in_stock')
+				@elseif($product->enable_stock)
+					{{ @num_format($product->qty_available) }} {{$product->unit}} @lang('lang_v1.in_stock')
 				@else
 					--
 				@endif

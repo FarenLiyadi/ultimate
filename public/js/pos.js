@@ -365,7 +365,11 @@ $(document).ready(function () {
                         __currency_precision,
                         true
                     );
-                    string += ' - ' + qty_available + item.unit;
+                    if (item.type == 'combo') {
+                        string += ' - ' + item.qty_available + ' Bundle';
+                    } else if (item.enable_stock == 1) {
+                        string += ' - ' + qty_available + item.unit;
+                    }
                 }
                 string += '</div>';
 

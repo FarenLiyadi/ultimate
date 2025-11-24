@@ -1684,6 +1684,20 @@ class SellPosController extends Controller
         $location_id,
         $check_qty
     );
+    // ======================================================================
+// PATCH: Override qty_available khusus untuk produk combo
+// ======================================================================
+if ($product->product_type == 'combo') {
+    $product->qty_available = $this->productUtil->getComboStock($product->variation_id, $location_id);
+
+    $product->formatted_qty_available = $this->productUtil->num_f(
+        $product->qty_available,
+        false,
+        null,
+        true
+    );
+}
+
 
     // =====================================================================
     // 1. AMBIL MULTI UNIT PRICES BERDASARKAN price_group_id + location
@@ -2203,6 +2217,14 @@ $output = $this->getSellLineRow(
                 ->with(['media', 'group_prices'])
                 ->orderBy('p.name', 'asc')
                 ->paginate(50);
+
+                // === Patch combo stock ===
+foreach ($products as $p) {
+    if ($p->type == 'combo') {
+        $p->qty_available = $this->productUtil->getComboStock($p->id, $location_id);
+    }
+}
+
 
             $price_groups = SellingPriceGroup::where('business_id', $business_id)->active()->pluck('name', 'id');
 
