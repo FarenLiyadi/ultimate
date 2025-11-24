@@ -1,6 +1,27 @@
 var global_brand_id = null;
 var global_p_category_id = null;
 var global_is_clear_local_storage = false;
+let CURRENT_PRICE_GROUP_ID = null;
+let CURRENT_LOCATION_ID = null;
+
+$('#price_group').on('change', function () {
+    CURRENT_PRICE_GROUP_ID = $(this).val();
+});
+
+$('#location_id').on('change', function () {
+    CURRENT_LOCATION_ID = $(this).val();
+});
+
+// Update saat user pilih group harga
+$(document).on('change', '#price_group', function () {
+    CURRENT_PRICE_GROUP_ID = $(this).val();
+});
+
+// Update saat user pilih lokasi
+$(document).on('change', '#location_id', function () {
+    CURRENT_LOCATION_ID = $(this).val();
+});
+
 $(document).ready(function () {
     customer_set = false;
     //Prevent enter key function except texarea
@@ -1888,11 +1909,13 @@ function pos_each_row(row_obj) {
 }
 function applyAllPricing(tr) {
     if (tr.data('manual_price') == 1) {
-        return; // harga manual, jangan overwrite
+        return; // jangan ubah harga manual
     }
+
     let qty = __read_number(tr.find('.pos_quantity'));
     let base_price = __read_number(tr.find('.hidden_base_unit_sell_price'));
     let multiplier = parseFloat(tr.find('.sub_unit option:selected').data('multiplier')) || 1;
+
     let sub_unit_id = parseInt(tr.find('.sub_unit').val()) || null;
 
     let unit_prices = JSON.parse(tr.find('.unit_prices_json').val() || '[]');
@@ -1900,22 +1923,39 @@ function applyAllPricing(tr) {
 
     let final_price = null;
 
-    // Multi unit price
-    let multi = unit_prices.find((u) => parseInt(u.unit_id) === sub_unit_id);
+    // ===============================
+    // 1. MULTI UNIT PRICE (BY GROUP)
+    // ===============================
+
+    let multi = unit_prices.find(
+        (u) =>
+            parseInt(u.unit_id) === sub_unit_id &&
+            (u.price_group_id == CURRENT_PRICE_GROUP_ID || u.price_group_id === null) &&
+            (u.location_id == CURRENT_LOCATION_ID || u.location_id === null)
+    );
+
     let multi_price = multi ? parseFloat(multi.price_inc_tax) : null;
 
     if (multi_price !== null) {
         final_price = multi_price;
     }
 
-    // QTY RULE — FILTER BY UNIT
+    // ===============================
+    // 2. QTY RULE (BY GROUP)
+    // ===============================
+
     let rule = qty_rules
-        .filter((r) => parseInt(r.unit_id) === sub_unit_id) // <<< FIX di sini!
+        .filter(
+            (r) =>
+                parseInt(r.unit_id) === sub_unit_id &&
+                (r.price_group_id == CURRENT_PRICE_GROUP_ID || r.price_group_id === null)
+        )
+        .sort((a, b) => b.min_qty - a.min_qty)
         .find((r) => qty >= parseFloat(r.min_qty));
 
     if (rule) {
         if (final_price === null) {
-            final_price = multi_price !== null ? multi_price : base_price * multiplier;
+            final_price = multi_price || base_price * multiplier;
         }
 
         let disc = parseFloat(rule.discount_value) || 0;
@@ -1927,13 +1967,12 @@ function applyAllPricing(tr) {
         }
     }
 
-    // Fallback
-    if (final_price === null) {
-        final_price = multi_price !== null ? multi_price : base_price * multiplier;
-    }
+    // ===============================
+    // 3. FALLBACK
+    // ===============================
 
-    if (isNaN(final_price) || final_price < 0) {
-        final_price = multi_price !== null ? multi_price : base_price * multiplier;
+    if (final_price === null) {
+        final_price = multi_price || base_price * multiplier;
     }
 
     __write_number(tr.find('.pos_unit_price_inc_tax'), final_price);

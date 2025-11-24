@@ -1644,169 +1644,235 @@ class SellPosController extends Controller
         ];
     }
     // is_serial_no to display serial number in sale screen
-    private function getSellLineRow($variation_id, $location_id, $quantity, $row_count, $is_direct_sell, $is_serial_no, $so_line = null)
-    {
-        $business_id = request()->session()->get('user.business_id');
-        $business_details = $this->businessUtil->getDetails($business_id);
-        //Check for weighing scale barcode
-        $weighing_barcode = request()->get('weighing_scale_barcode');
+   private function getSellLineRow(
+    $variation_id,
+    $location_id,
+    $quantity,
+    $row_count,
+    $is_direct_sell,
+    $is_serial_no,
+    $so_line = null
+) {
+    $business_id = request()->session()->get('user.business_id');
+    $business_details = $this->businessUtil->getDetails($business_id);
 
-        $pos_settings = empty($business_details->pos_settings) ? $this->businessUtil->defaultPosSettings() : json_decode($business_details->pos_settings, true);
+    $pos_settings = empty($business_details->pos_settings)
+        ? $this->businessUtil->defaultPosSettings()
+        : json_decode($business_details->pos_settings, true);
 
-        $check_qty = !empty($pos_settings['allow_overselling']) ? false : true;
+    $check_qty = !empty($pos_settings['allow_overselling']) ? false : true;
 
-        $is_sales_order = request()->has('is_sales_order') && request()->input('is_sales_order') == 'true' ? true : false;
-        $is_draft = request()->has('is_draft') && request()->input('is_draft') == 'true' ? true : false;
-
-        if ($is_sales_order || !empty($so_line) || $is_draft) {
-            $check_qty = false;
-        }
-
-        if (request()->input('disable_qty_alert') === 'true') {
-            $pos_settings['allow_overselling'] = true;
-        }
-
-        $product = $this->productUtil->getDetailsFromVariation($variation_id, $business_id, $location_id, $check_qty);
-        // ===============================================
-        // MULTI UNIT PRICE
-        // ===============================================
-        $unit_prices = VariationUnitPrice::where('variation_id', $variation_id)->get();
-     
-
-
-        // ===============================================
-        // QTY TIER PRICING RULES
-        // ===============================================
-        $qty_rules = QtyPricingRule::where('variation_id', $variation_id)->get();
-
-        // ===============================================
-        // PRICE GROUP CUSTOMER
-        // ===============================================
-        $price_group_prices = [];
-        $price_group_id = request()->input('price_group');
-
-        if (!empty($price_group_id)) {
-            $price_group_prices = VariationGroupPrice::where('variation_id', $variation_id)
-                ->where('price_group_id', $price_group_id)
-                ->get();
-        }
-
-        // ===============================================
-        // LOCATION PRICE OVERRIDE
-        // ===============================================
-        $location_prices = VariationLocationDetails::where('variation_id', $variation_id)
-            ->where('location_id', $location_id)
-            ->first();
-
-
-
-        if (!isset($product->quantity_ordered)) {
-            $product->quantity_ordered = $quantity;
-        }
-
-        $product->secondary_unit_quantity = !isset($product->secondary_unit_quantity) ? 0 : $product->secondary_unit_quantity;
-
-        $product->formatted_qty_available = $this->productUtil->num_f($product->qty_available, false, null, true);
-
-        $sub_units = $this->productUtil->getSubUnits($business_id, $product->unit_id, false, $product->product_id);
-
-        //Get customer group and change the price accordingly
-        $customer_id = request()->get('customer_id', null);
-        $cg = $this->contactUtil->getCustomerGroup($business_id, $customer_id);
-        $percent = (empty($cg) || empty($cg->amount) || $cg->price_calculation_type != 'percentage') ? 0 : $cg->amount;
-        $product->default_sell_price = $product->default_sell_price + ($percent * $product->default_sell_price / 100);
-        $product->sell_price_inc_tax = $product->sell_price_inc_tax + ($percent * $product->sell_price_inc_tax / 100);
-
-        $tax_dropdown = TaxRate::forBusinessDropdown($business_id, true, true);
-
-        $enabled_modules = $this->transactionUtil->allModulesEnabled();
-
-        //Get lot number dropdown if enabled
-        $lot_numbers = [];
-        if (request()->session()->get('business.enable_lot_number') == 1 || request()->session()->get('business.enable_product_expiry') == 1) {
-            $lot_number_obj = $this->transactionUtil->getLotNumbersFromVariation($variation_id, $business_id, $location_id, true);
-            foreach ($lot_number_obj as $lot_number) {
-                $lot_number->qty_formated = $this->productUtil->num_f($lot_number->qty_available);
-                $lot_numbers[] = $lot_number;
-            }
-        }
-        $product->lot_numbers = $lot_numbers;
-
-        $purchase_line_id = request()->get('purchase_line_id');
-
-        $price_group = request()->input('price_group');
-        if (!empty($price_group)) {
-            $variation_group_prices = $this->productUtil->getVariationGroupPrice($variation_id, $price_group, $product->tax_id);
-
-            if (!empty($variation_group_prices['price_inc_tax'])) {
-                $product->sell_price_inc_tax = $variation_group_prices['price_inc_tax'];
-                $product->default_sell_price = $variation_group_prices['price_exc_tax'];
-            }
-        }
-
-        $warranties = $this->__getwarranties();
-
-        $output['success'] = true;
-        $output['enable_sr_no'] = $product->enable_sr_no;
-
-        $waiters = [];
-        if ($this->productUtil->isModuleEnabled('service_staff') && !empty($pos_settings['inline_service_staff'])) {
-            $waiters_enabled = true;
-            $waiters = $this->productUtil->serviceStaffDropdown($business_id, $location_id);
-        }
-
-        $last_sell_line = null;
-        if ($is_direct_sell) {
-            $last_sell_line = $this->getLastSellLineForCustomer($variation_id, $customer_id, $location_id);
-        }
-
-        if (request()->get('type') == 'sell-return') {
-            $output['html_content'] = view('sell_return.partials.product_row')
-                ->with(compact('product', 'row_count', 'tax_dropdown', 'enabled_modules', 'sub_units'))
-                ->render();
-        } else {
-            $is_cg = !empty($cg->id) ? true : false;
-
-            $discount = $this->productUtil->getProductDiscount($product, $business_id, $location_id, $is_cg, $price_group, $variation_id);
-
-            if ($is_direct_sell) {
-                $edit_discount = auth()->user()->can('edit_product_discount_from_sale_screen');
-                $edit_price = auth()->user()->can('edit_product_price_from_sale_screen');
-            } else {
-                $edit_discount = auth()->user()->can('edit_product_discount_from_pos_screen');
-                $edit_price = auth()->user()->can('edit_product_price_from_pos_screen');
-            }
-
-           $output['html_content'] = view('sale_pos.product_row')
-    ->with(compact(
-        'product',
-        'row_count',
-        'tax_dropdown',
-        'enabled_modules',
-        'pos_settings',
-        'sub_units',
-        'discount',
-        'waiters',
-        'edit_discount',
-        'edit_price',
-        'purchase_line_id',
-        'warranties',
-        'quantity',
-        'is_direct_sell',
-        'so_line',
-        'is_sales_order',
-        'last_sell_line',
-        'is_serial_no',
-        'unit_prices',
-        'qty_rules',
-        'price_group_prices',
-        'location_prices'
-    ))
-    ->render();
-            }
-
-        return $output;
+    if (
+        request()->input('is_sales_order') == 'true' ||
+        !empty($so_line) ||
+        request()->input('is_draft') == 'true'
+    ) {
+        $check_qty = false;
     }
+
+    if (request()->input('disable_qty_alert') === 'true') {
+        $pos_settings['allow_overselling'] = true;
+    }
+
+    // Ambil price group
+    $price_group_id = request()->input('price_group') ?: null;
+
+    // Ambil detail produk dasar
+    $product = $this->productUtil->getDetailsFromVariation(
+        $variation_id,
+        $business_id,
+        $location_id,
+        $check_qty
+    );
+
+    // =====================================================================
+    // 1. AMBIL MULTI UNIT PRICES BERDASARKAN price_group_id + location
+    // =====================================================================
+
+    $unit_prices = VariationUnitPrice::where('variation_id', $variation_id)
+    ->where(function ($q) use ($price_group_id) {
+        $q->where('price_group_id', $price_group_id)
+          ->orWhereNull('price_group_id');
+    })
+    ->where(function ($q) use ($location_id) {
+        $q->where('location_id', $location_id)
+          ->orWhereNull('location_id');
+    })
+    ->orderByRaw("price_group_id IS NOT NULL DESC")
+    ->orderByRaw("location_id IS NOT NULL DESC")
+    ->get();
+
+    // ======================================================================
+    // 2. OVERRIDE BASE PRICE UTAMA (UNIT DEFAULT) DARI variation_unit_prices
+    // ======================================================================
+
+    $base_price_row = $unit_prices->firstWhere('unit_id', $product->unit_id);
+
+    if ($base_price_row) {
+        $product->sell_price_inc_tax = $base_price_row->price_inc_tax;
+        $product->default_sell_price = $base_price_row->price_inc_tax;
+    }
+
+    // ======================================================================
+    // 3. QTY RULES BERDASARKAN price_group_id
+    // ======================================================================
+
+    $qty_rules = QtyPricingRule::where('variation_id', $variation_id)
+        ->where(function ($q) use ($price_group_id) {
+            $q->where('price_group_id', $price_group_id)
+              ->orWhereNull('price_group_id');
+        })
+        ->get();
+
+    // ======================================================================
+    // 4. LOCATION PRICING
+    // ======================================================================
+    $location_prices = VariationLocationDetails::where('variation_id', $variation_id)
+        ->where('location_id', $location_id)
+        ->first();
+
+    // ======================================================================
+    // 5. PERSIAPAN DATA LAIN
+    // ======================================================================
+
+    if (!isset($product->quantity_ordered)) {
+        $product->quantity_ordered = $quantity;
+    }
+
+    $product->formatted_qty_available = $this->productUtil->num_f(
+        $product->qty_available,
+        false,
+        null,
+        true
+    );
+
+    $sub_units = $this->productUtil->getSubUnits(
+        $business_id,
+        $product->unit_id,
+        false,
+        $product->product_id
+    );
+
+    // Customer group discount (masih sama)
+    $customer_id = request()->get('customer_id', null);
+    $cg = $this->contactUtil->getCustomerGroup($business_id, $customer_id);
+
+    if (!empty($cg) && $cg->price_calculation_type == 'percentage') {
+        $percent = $cg->amount;
+        $product->default_sell_price +=
+            ($percent * $product->default_sell_price) / 100;
+        $product->sell_price_inc_tax +=
+            ($percent * $product->sell_price_inc_tax) / 100;
+    }
+
+    $tax_dropdown = TaxRate::forBusinessDropdown($business_id, true, true);
+    $enabled_modules = $this->transactionUtil->allModulesEnabled();
+
+    // LOT NUMBERS
+    $lot_numbers = [];
+
+    if (
+        request()->session()->get('business.enable_lot_number') == 1 ||
+        request()->session()->get('business.enable_product_expiry') == 1
+    ) {
+        $lot_number_obj = $this->transactionUtil->getLotNumbersFromVariation(
+            $variation_id,
+            $business_id,
+            $location_id,
+            true
+        );
+
+        foreach ($lot_number_obj as $lot_number) {
+            $lot_number->qty_formated = $this->productUtil->num_f(
+                $lot_number->qty_available
+            );
+
+            $lot_numbers[] = $lot_number;
+        }
+    }
+
+    $product->lot_numbers = $lot_numbers;
+
+    $purchase_line_id = request()->get('purchase_line_id');
+    $warranties = $this->__getwarranties();
+
+    $output['success'] = true;
+    $output['enable_sr_no'] = $product->enable_sr_no;
+
+    $waiters = [];
+
+    if (
+        $this->productUtil->isModuleEnabled('service_staff') &&
+        !empty($pos_settings['inline_service_staff'])
+    ) {
+        $waiters = $this->productUtil->serviceStaffDropdown(
+            $business_id,
+            $location_id
+        );
+    }
+
+    $last_sell_line = null;
+    if ($is_direct_sell) {
+        $last_sell_line = $this->getLastSellLineForCustomer(
+            $variation_id,
+            $customer_id,
+            $location_id
+        );
+    }
+
+    // ======================================================================
+    // 6. RENDER VIEW
+    // ======================================================================
+
+    $is_cg = !empty($cg->id);
+
+    $discount = $this->productUtil->getProductDiscount(
+        $product,
+        $business_id,
+        $location_id,
+        $is_cg,
+        $price_group_id,
+        $variation_id
+    );
+
+    $edit_discount = auth()
+        ->user()
+        ->can('edit_product_discount_from_pos_screen');
+
+    $edit_price = auth()
+        ->user()
+        ->can('edit_product_price_from_pos_screen');
+
+    $output['html_content'] = view('sale_pos.product_row')
+        ->with(
+            compact(
+                'product',
+                'row_count',
+                'tax_dropdown',
+                'enabled_modules',
+                'pos_settings',
+                'sub_units',
+                'discount',
+                'waiters',
+                'edit_discount',
+                'edit_price',
+                'purchase_line_id',
+                'warranties',
+                'quantity',
+                'is_direct_sell',
+                'so_line',
+                'last_sell_line',
+                'is_serial_no',
+                'unit_prices',
+                'qty_rules',
+                'location_prices'
+            )
+        )
+        ->render();
+
+    return $output;
+}
+
 
     /**
      * Finds last sell line of a variation for the customer for a location

@@ -21,6 +21,8 @@ use App\VariationLocationDetails;
 use App\VariationTemplate;
 use App\VariationValueTemplate;
 use Illuminate\Support\Facades\DB;
+use App\VariationUnitPrice;
+
 
 class ProductUtil extends Util
 {
@@ -553,7 +555,31 @@ class ProductUtil extends Util
 
             $product->combo_products = $this->calculateComboDetails($location_id, $product->combo_variations);
         }
+// =============================================
+// APPLY BASE PRICE FROM variation_unit_prices
+// =============================================
 
+$price_group_id = request()->input('price_group');
+$location_id = request()->input('location_id');
+
+$base_price_row = VariationUnitPrice::where('variation_id', $variation_id)
+    ->where('unit_id', $product->unit_id)
+    ->where(function ($q) use ($price_group_id) {
+        $q->where('price_group_id', $price_group_id)
+          ->orWhereNull('price_group_id');
+    })
+    ->where(function ($q) use ($location_id) {
+        $q->where('location_id', $location_id)
+          ->orWhereNull('location_id');
+    })
+    ->orderByRaw("price_group_id IS NOT NULL DESC")
+    ->orderByRaw("location_id IS NOT NULL DESC")
+    ->first();
+
+if ($base_price_row) {
+    $product->default_sell_price = $base_price_row->price_inc_tax;
+    $product->sell_price_inc_tax = $base_price_row->price_inc_tax;
+}
         return $product;
     }
 

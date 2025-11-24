@@ -82,22 +82,30 @@ class ProductController extends Controller
                 || request()->session()->get('business.enable_row')
                 || request()->session()->get('business.enable_position'));
 
-            $query = Product::with(['media'])
-                ->leftJoin('brands', 'products.brand_id', '=', 'brands.id')
-                ->join('units', 'products.unit_id', '=', 'units.id')
-                ->leftJoin('categories as c1', 'products.category_id', '=', 'c1.id')
-                ->leftJoin('categories as c2', 'products.sub_category_id', '=', 'c2.id')
-                ->leftJoin('tax_rates', 'products.tax', '=', 'tax_rates.id')
-                ->join('variations as v', 'v.product_id', '=', 'products.id')
-                ->leftJoin('variation_location_details as vld', function ($join) use ($permitted_locations) {
-                    $join->on('vld.variation_id', '=', 'v.id');
-                    if ($permitted_locations != 'all') {
-                        $join->whereIn('vld.location_id', $permitted_locations);
-                    }
-                })
-                ->whereNull('v.deleted_at')
-                ->where('products.business_id', $business_id)
-                ->where('products.type', '!=', 'modifier');
+           $query = Product::with(['media'])
+    ->leftJoin('brands', 'products.brand_id', '=', 'brands.id')
+    ->join('units', 'products.unit_id', '=', 'units.id')
+    ->leftJoin('categories as c1', 'products.category_id', '=', 'c1.id')
+    ->leftJoin('categories as c2', 'products.sub_category_id', '=', 'c2.id')
+    ->leftJoin('tax_rates', 'products.tax', '=', 'tax_rates.id')
+    ->join('variations as v', 'v.product_id', '=', 'products.id')
+    ->leftJoin('variation_location_details as vld', function ($join) use ($permitted_locations, $location_id) {
+        $join->on('vld.variation_id', '=', 'v.id');
+
+        // 🔹 Jika user pilih lokasi tertentu → stok hanya lokasi itu
+        if (!empty($location_id) && $location_id !== 'none') {
+            $join->where('vld.location_id', $location_id);
+        }
+        // 🔹 Jika tidak pilih lokasi tapi ada pembatasan lokasi yang diizinkan
+        elseif ($permitted_locations != 'all') {
+            $join->whereIn('vld.location_id', (array) $permitted_locations);
+        }
+        // 🔹 Kalau permitted_locations = 'all' dan location_id kosong → biarkan all lokasi
+    })
+    ->whereNull('v.deleted_at')
+    ->where('products.business_id', $business_id)
+    ->where('products.type', '!=', 'modifier');
+
 
            
             // Join ke product_racks hanya jika lokasi dipilih & fitur aktif
