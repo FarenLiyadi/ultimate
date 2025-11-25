@@ -155,6 +155,7 @@
       			</div>
       		@endif
       		@endif
+		
       		@if($product->type == 'single')
       			@include('product.partials.single_product_details')
       		@elseif($product->type == 'variable')

@@ -199,7 +199,7 @@ section.content > .col-sm-12 {
 
 <div class="tab-content">
     @foreach($business_locations as $locId => $locName)
-        <div class="tab-pane fade {{ $loop->first ? 'show active' : '' }}"
+        <div class="tab-pane {{ $loop->first ? 'active in' : '' }}"
              id="loc_{{ $locId }}">
 
             @include('product.partials.variation_unit_prices', [

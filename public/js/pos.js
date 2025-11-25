@@ -377,6 +377,46 @@ $(document).ready(function () {
             }
         };
     }
+    function update_unit_price_display(tr) {
+        let qty = __read_number(tr.find('.pos_quantity'));
+        let subtotal = __read_number(tr.find('.pos_line_total'));
+
+        if (qty > 0) {
+            let per_item = subtotal / qty;
+            tr.find('.unit_price_display').text(
+                '(@ ' + __currency_trans_from_en(per_item, true) + ' / item)'
+            );
+        } else {
+            tr.find('.unit_price_display').text('');
+        }
+    }
+    $(document).on('click', '.update_price', function () {
+        let modal = $(this).closest('.row_edit_product_price_model');
+
+        // Ambil row_index
+        let row_index = modal.attr('id').replace('row_edit_product_price_modal_', '');
+        let tr = $('tr[data-row_index="' + row_index + '"]');
+
+        // Ambil harga baru dari modal
+        let new_price = __read_number(modal.find('.pos_unit_price'));
+
+        // Validasi
+        if (!isFinite(new_price) || new_price <= 0) {
+            toastr.error('Harga tidak valid');
+            return;
+        }
+
+        // Lock manual
+        tr.data('manual_price', 1);
+
+        // Update harga ke POS
+        __write_number(tr.find('.pos_unit_price_inc_tax'), new_price);
+        tr.find('.pos_unit_price_inc_tax').trigger('change');
+
+        // // Reset diskon jadi kosong
+        // tr.find('.row_discount_amount').val('');
+        // tr.find('.row_discount_type').val('fixed');
+    });
 
     //Update line total and check for quantity not greater than max quantity
     $('table#pos_table tbody').on('change', 'input.pos_quantity', function () {
@@ -428,6 +468,7 @@ $(document).ready(function () {
         __write_number(tr.find('input.pos_line_total'), line_total);
         tr.find('span.pos_line_total_text').text(__currency_trans_from_en(line_total, true));
         pos_each_row(tr);
+        update_unit_price_display(tr);
         pos_total_row();
         round_row_to_iraqi_dinnar(tr);
     });
@@ -443,6 +484,7 @@ $(document).ready(function () {
         var unit_price = get_unit_price_from_discounted_unit_price(tr, discounted_unit_price);
         __write_number(tr.find('input.pos_unit_price'), unit_price);
         pos_each_row(tr);
+        update_unit_price_display(tr);
     });
 
     //If change in unit price including tax, update unit price
@@ -468,6 +510,7 @@ $(document).ready(function () {
         tr.find('span.pos_line_total_text').text(__currency_trans_from_en(line_total, true));
 
         pos_each_row(tr);
+        update_unit_price_display(tr);
         pos_total_row();
     });
 
@@ -553,6 +596,7 @@ $(document).ready(function () {
             __write_number(tr.find('input.pos_line_total'), line_total, false);
             tr.find('span.pos_line_total_text').text(__currency_trans_from_en(line_total, true));
             pos_each_row(tr);
+            update_unit_price_display(tr);
             pos_total_row();
             round_row_to_iraqi_dinnar(tr);
         }
@@ -1912,54 +1956,58 @@ function pos_each_row(row_obj) {
     __write_number(row_obj.find('input.item_tax'), unit_price_inc_tax - discounted_unit_price);
 }
 function applyAllPricing(tr) {
-    if (tr.data('manual_price') == 1) {
-        return; // jangan ubah harga manual
-    }
+    // Jika user override harga, jangan sentuh
+    if (tr.data('manual_price') == 1) return;
 
     let qty = __read_number(tr.find('.pos_quantity'));
-    let base_price = __read_number(tr.find('.hidden_base_unit_sell_price'));
+    let variation_id = parseInt(tr.find('.row_variation_id').val());
+    let sub_unit_id = parseInt(tr.find('.sub_unit').val());
     let multiplier = parseFloat(tr.find('.sub_unit option:selected').data('multiplier')) || 1;
 
-    let sub_unit_id = parseInt(tr.find('.sub_unit').val()) || null;
+    let location_id = CURRENT_LOCATION_ID || $('#select_location_id').val() || 1;
+    let price_group_id = CURRENT_PRICE_GROUP_ID ?? null;
 
     let unit_prices = JSON.parse(tr.find('.unit_prices_json').val() || '[]');
     let qty_rules = JSON.parse(tr.find('.qty_rules_json').val() || '[]');
 
     let final_price = null;
 
-    // ===============================
-    // 1. MULTI UNIT PRICE (BY GROUP)
-    // ===============================
+    // ===============================================
+    // 1. MULTI-UNIT PRICE (variation_unit_prices)
+    // ===============================================
 
-    let multi = unit_prices.find(
-        (u) =>
-            parseInt(u.unit_id) === sub_unit_id &&
-            (u.price_group_id == CURRENT_PRICE_GROUP_ID || u.price_group_id === null) &&
-            (u.location_id == CURRENT_LOCATION_ID || u.location_id === null)
+    let multi_price = null;
+
+    let match = unit_prices.find(
+        (p) =>
+            parseInt(p.variation_id) === variation_id &&
+            parseInt(p.unit_id) === sub_unit_id &&
+            (p.location_id == location_id || p.location_id === null) &&
+            (p.price_group_id == price_group_id || p.price_group_id === null)
     );
 
-    let multi_price = multi ? parseFloat(multi.price_inc_tax) : null;
-
-    if (multi_price !== null) {
+    if (match) {
+        multi_price = parseFloat(match.price_inc_tax);
         final_price = multi_price;
     }
 
-    // ===============================
-    // 2. QTY RULE (BY GROUP)
-    // ===============================
+    // ===============================================
+    // 2. QTY RULES
+    // ===============================================
 
     let rule = qty_rules
         .filter(
             (r) =>
                 parseInt(r.unit_id) === sub_unit_id &&
-                (r.price_group_id == CURRENT_PRICE_GROUP_ID || r.price_group_id === null)
+                parseInt(r.variation_id) === variation_id &&
+                (r.price_group_id == price_group_id || r.price_group_id == null)
         )
         .sort((a, b) => b.min_qty - a.min_qty)
         .find((r) => qty >= parseFloat(r.min_qty));
 
     if (rule) {
         if (final_price === null) {
-            final_price = multi_price || base_price * multiplier;
+            final_price = multi_price;
         }
 
         let disc = parseFloat(rule.discount_value) || 0;
@@ -1971,13 +2019,18 @@ function applyAllPricing(tr) {
         }
     }
 
-    // ===============================
+    // ===============================================
     // 3. FALLBACK
-    // ===============================
+    // ===============================================
 
     if (final_price === null) {
-        final_price = multi_price || base_price * multiplier;
+        let base_price = __read_number(tr.find('.hidden_base_unit_sell_price'));
+        final_price = base_price * multiplier;
     }
+
+    // ===============================================
+    // 4. APPLY TO POS
+    // ===============================================
 
     __write_number(tr.find('.pos_unit_price_inc_tax'), final_price);
     tr.find('.pos_unit_price_inc_tax').trigger('change');
