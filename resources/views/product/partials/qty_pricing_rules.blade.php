@@ -1,318 +1,419 @@
-<h5 class="mb-2 tw-text-xl">Harga Khusus Qty per Satuan </h5>
+<h5 class="mb-3 tw-text-xl font-bold">Harga Khusus Qty per Satuan</h5>
+
+<style>
+    .qty-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #fafafa;
+        padding: 16px;
+        margin-bottom: 22px;
+    }
+    .price-warning {
+        border: 2px solid #ff4d4d !important;
+        background: #ffecec !important;
+    }
+    .is-invalid {
+        border: 2px solid red !important;
+        background: #fff0f0 !important;
+    }
+    .qty-table thead th {
+        background: #f3f4f6;
+        text-align: center;
+        font-weight: 600;
+        border-bottom: 2px solid #ddd;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+    .qty-unit-title {
+        font-weight: 700;
+        margin: 10px 0 6px 0;
+        font-size: 15px;
+        color: #374151;
+    }
+    .js-base-label {
+        font-size: 11px;
+        color: #6b7280;
+        display: block;
+        margin-bottom: 3px;
+    }
+</style>
 
 @php
-  // kelompokkan rules: [variation_id][unit_id] = list tier
-  $rules_map = [];
-  foreach ($rules as $r) {
-    $rules_map[$r->variation_id][$r->unit_id][] = $r;
-  }
-  // ambil separator dari setting
-  $thousand = session('currency.thousand_separator') ?? '.';
-  $decimal  = session('currency.decimal_separator') ?? ',';
+    // kelompokkan rules
+    $rules_map = [];
+    foreach ($rules as $r) {
+        $rules_map[$r->variation_id][$r->unit_id][] = $r;
+    }
+
+    $thousand = session('currency.thousand_separator') ?? '.';
+    $decimal  = session('currency.decimal_separator') ?? ',';
 @endphp
 
 @foreach($product->variations as $v)
-  <div class="card mb-3">
-    <div class="card-body p-2">
-      @foreach($units_for_product as $uid => $uname)
-        <h6 class="mt-2 mb-1 tw-text-lg">Unit: {{ $uname }}</h6>
-        <table class="table table-sm table-bordered align-middle">
-          <thead>
-            <tr>
-              <th style="width:140px;">Price Group</th>
-              <th style="width:120px;">Min Qty (≥)</th>
-              <th style="width:160px;">Harga/Unit (Inc. Tax)</th>
-              <th style="width:160px;">Lokasi</th>
-              <th style="width:260px;">Periode</th>
-              <th style="width:60px;"></th>
-            </tr>
-          </thead>
-          <tbody data-unit="{{ $uid }}" data-var="{{ $v->id }}">
-            @php $tier_list = $rules_map[$v->id][$uid] ?? []; @endphp
+<div class="qty-card">
+    <h5 class="tw-text-lg font-bold mb-2">
+        {{ $product->type=='variable' ? $v->product_variation->name . ' – ' . $v->name : $product->name }}
+        <small class="text-muted">({{ $v->sub_sku }})</small>
+    </h5>
+
+    @foreach($units_for_product as $uid => $uname)
+        <div class="qty-unit-title">Unit: {{ $uname }}</div>
+
+        @php $tier_list = $rules_map[$v->id][$uid] ?? []; @endphp
+
+        <table class="table table-sm table-bordered qty-table">
+            <thead>
+                <tr>
+                    <th style="width:150px;">Price Group</th>
+                    <th style="width:100px;">Min Qty</th>
+                    <th style="width:170px;">Harga Final</th>
+                    <th style="width:150px;">Lokasi *</th>
+                    <th style="width:250px;">Periode</th>
+                    <th style="width:55px;"></th>
+                </tr>
+            </thead>
+
+            <tbody data-var="{{ $v->id }}" data-unit="{{ $uid }}" data-next="{{ count($tier_list) }}">
 
             @foreach($tier_list as $i => $r)
-              <tr>
-                {{-- 1) Price Group --}}
-                <td>
-                  <select name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][price_group_id]" class="form-control">
-                    <option value="" @selected(!$r->price_group_id)>Default</option>
-                    @foreach($price_groups as $pgid => $pgname)
-                      <option value="{{ $pgid }}" @selected($r->price_group_id==$pgid)>{{ $pgname }}</option>
-                    @endforeach
-                  </select>
-                </td>
+                <tr>
+                    {{-- Price Group --}}
+                    <td>
+                        <select name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][price_group_id]"
+                                class="form-control js-pg">
+                            <option value="">Default</option>
+                            @foreach($price_groups as $pgid => $pgname)
+                                <option value="{{ $pgid }}" @selected($r->price_group_id==$pgid)>
+                                    {{ $pgname }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </td>
 
-                {{-- 2) Min Qty --}}
-                <td>
-                  <input type="number" min="1"
-                    name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][min_qty]"
-                    value="{{ $r->min_qty }}"
-                    class="form-control" required>
-                </td>
+                    {{-- Min qty --}}
+                    <td>
+                        <input type="number" min="1" class="form-control js-minqty"
+                        name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][min_qty]"
+                        value="{{ $r->min_qty }}" required>
+                    </td>
 
-                {{-- 3) Harga/Unit (Inc. Tax) + hidden discount --}}
-                <td>
-                  <div class="input-group">
-                    <span class="input-group-addon">IDR</span>
-                    <input
-                      type="text" inputmode="decimal"
-                      class="form-control input_number js-final-price"
-                      name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][final_price_inc_tax]"
-                      value="" placeholder="cth: 13.500"
-                      data-var="{{ $v->id }}"
-                      data-unit="{{ $uid }}"
-                      data-pg="{{ $r->price_group_id ?? '' }}">
-                  </div>
-                  <input type="hidden" class="js-discount-type"
-                        name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][discount_type]"
-                        value="{{ $r->discount_type ?? 'fixed' }}">
-                  <input type="hidden" class="js-discount-value"
-                        name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][discount_value]"
-                        value="{{ $r->discount_value ?? 0 }}">
-                </td>
+                    {{-- Harga Final --}}
+                    <td>
+                        <span class="js-base-label"></span>
 
-                {{-- 4) Lokasi --}}
-                <td>
-                  <select name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][location_id]" class="form-control">
-                    <option value="">Semua</option>
-                    @foreach($business_locations as $locId => $locName)
-                      <option value="{{ $locId }}" @selected($r->location_id==$locId)>{{ $locName }}</option>
-                    @endforeach
-                  </select>
-                </td>
+                        <div class="input-group">
+                            <span class="input-group-addon">IDR</span>
+                            <input type="text" inputmode="decimal"
+                                   class="form-control input_number js-final-price"
+                                   name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][final_price_inc_tax]"
+                                   data-var="{{ $v->id }}" data-unit="{{ $uid }}"
+                                   data-pg="{{ $r->price_group_id ?? '' }}">
+                        </div>
 
-                {{-- 5) Periode --}}
-                <td class="d-flex gap-1">
-                  <input type="date" name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][valid_from]" value="{{ $r->valid_from }}" class="form-control">
-                  <input type="date" name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][valid_to]"   value="{{ $r->valid_to }}"   class="form-control">
-                </td>
+                        <input type="hidden" class="js-discount-type"
+                               name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][discount_type]"
+                               value="{{ $r->discount_type ?? 'fixed' }}">
+                        <input type="hidden" class="js-discount-value"
+                               name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][discount_value]"
+                               value="{{ $r->discount_value ?? 0 }}">
+                    </td>
 
-                {{-- 6) Aksi --}}
-                <td>
-                  <button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()">Hapus</button>
-                </td>
-              </tr>
+                    {{-- Lokasi --}}
+                    <td>
+                        <select name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][location_id]"
+                                class="form-control js-loc" required>
+                            <option value="" disabled selected>Pilih Lokasi</option>
+                            @foreach($business_locations as $lid => $lname)
+                                <option value="{{ $lid }}" @selected($r->location_id==$lid)>
+                                    {{ $lname }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </td>
+
+                    {{-- Periode --}}
+                    <td>
+                        <div style="display:flex; gap:6px;">
+                            <input type="date" class="form-control"
+                                   name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][valid_from]"
+                                   value="{{ $r->valid_from }}">
+                            <input type="date" class="form-control"
+                                   name="qty_rules[{{ $v->id }}][{{ $uid }}][{{ $i }}][valid_to]"
+                                   value="{{ $r->valid_to }}">
+                        </div>
+                    </td>
+
+                    {{-- Tools --}}
+                    <td class="text-center">
+                        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">
+                            Hapus
+                        </button>
+
+                        <button type="button" class="btn btn-outline-secondary btn-sm duplicate-tier">
+                            ×
+                        </button>
+                    </td>
+                </tr>
             @endforeach
-          </tbody>
+            </tbody>
         </table>
 
-        <button type="button" class="btn btn-outline-secondary btn-sm add-tier"
-                data-var="{{ $v->id }}" data-unit="{{ $uid }}">+ Tambah Tier</button>
-        <hr class="my-2">
-      @endforeach
-    </div>
-  </div>
+        <button type="button"
+                class="btn btn-sm btn-outline-secondary btn-add-tier"
+                data-var="{{ $v->id }}" data-unit="{{ $uid }}">
+            + Tambah Tier
+        </button>
+
+        <hr>
+    @endforeach
+</div>
 @endforeach
 
 <script>
-document.addEventListener('click', function(e){
-  if(!e.target.classList.contains('add-tier')) return;
-
-  const varId  = e.target.dataset.var;
-  const unitId = e.target.dataset.unit;
-  const tbody  = e.target.closest('.card-body')
-                   .querySelector(`tbody[data-var="${varId}"][data-unit="${unitId}"]`);
-  const nextIdx = tbody.querySelectorAll('tr').length;
-
-  const rowHtml = `
-<tr>
-  <td>
-    <select name="qty_rules[${varId}][${unitId}][${nextIdx}][price_group_id]" class="form-control">
-      <option value="">Default</option>
-      @foreach($price_groups as $pgid => $pgname)
-        <option value="{{ $pgid }}">{{ $pgname }}</option>
-      @endforeach
-    </select>
-  </td>
-  <td><input type="number" min="1" name="qty_rules[${varId}][${unitId}][${nextIdx}][min_qty]" value="3" class="form-control" required></td>
-
-  <td>
-    <div class="input-group">
-      <span class="input-group-addon">IDR</span>
-      <input
-        type="text" inputmode="decimal"
-        class="form-control input_number js-final-price"
-        name="qty_rules[${varId}][${unitId}][${nextIdx}][final_price_inc_tax]"
-        placeholder="cth: 13.500"
-        data-var="${varId}"
-        data-unit="${unitId}"
-        data-pg="">
-    </div>
-    <input type="hidden" class="js-discount-type"
-           name="qty_rules[${varId}][${unitId}][${nextIdx}][discount_type]" value="fixed">
-    <input type="hidden" class="js-discount-value"
-           name="qty_rules[${varId}][${unitId}][${nextIdx}][discount_value]" value="0">
-  </td>
-
-  <td>
-    <select name="qty_rules[${varId}][${unitId}][${nextIdx}][location_id]" class="form-control">
-      <option value="">Semua</option>
-      @foreach($business_locations as $locId => $locName)
-        <option value="{{ $locId }}">{{ $locName }}</option>
-      @endforeach
-    </select>
-  </td>
-  <td class="d-flex gap-1">
-    <input type="date" name="qty_rules[${varId}][${unitId}][${nextIdx}][valid_from]" class="form-control">
-    <input type="date" name="qty_rules[${varId}][${unitId}][${nextIdx}][valid_to]" class="form-control">
-  </td>
-  <td><button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove()">Hapus</button></td>
-</tr>`;
-
-  tbody.insertAdjacentHTML('beforeend', rowHtml);
-
-  // apply mask ke field baru
-  if (typeof $.fn.inputmask === 'function') {
-    $(tbody).find('tr:last .input_number').inputmask(window.__qtyMaskOpts || {});
-  }
-});
-</script>
-
-<script>
+/* ===============================
+   CONFIG
+================================*/
 window.QTY_DIGITS = 2;
 
-// Opsi Inputmask global (ambil separator dari Blade)
 window.__qtyMaskOpts = {
-  alias: 'numeric',
-  groupSeparator: @json($thousand),
-  radixPoint: @json($decimal),
-  autoGroup: true,
-  digits: window.QTY_DIGITS,
-  digitsOptional: false,
-  rightAlign: false,
-  removeMaskOnSubmit: true,
-  allowMinus: false,
-  placeholder: '0'
+    alias: "numeric",
+    groupSeparator: "{{ $thousand }}",
+    radixPoint: "{{ $decimal }}",
+    autoGroup: true,
+    digits: window.QTY_DIGITS,
+    digitsOptional: false,
+    rightAlign: false,
+    removeMaskOnSubmit: true,
+    allowMinus: false,
+    placeholder: "0"
 };
 
-// init mask saat load + inisialisasi nilai final dari diskon tersimpan
-document.addEventListener('DOMContentLoaded', function(){
-  if (typeof $.fn.inputmask === 'function') {
-    $('.input_number').inputmask(window.__qtyMaskOpts);
-  }
-  document.querySelectorAll('tbody[data-var][data-unit] tr').forEach(function(tr){
-    recalcRow(tr, /*roundNow=*/true);  // format & isi awal
-  });
-});
-
-// util: escape karakter ke regex
-function escRe(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
-
-// Ambil angka unmasked (aman utk locale)
-function getNumeric(el) {
-  if (!el) return NaN;
-  if (el.inputmask && typeof el.inputmask.unmaskedvalue === 'function') {
-    const raw = el.inputmask.unmaskedvalue(); // '.' sebagai radix oleh inputmask
-    return raw === '' ? NaN : parseFloat(raw);
-  }
-  // fallback tanpa plugin → gunakan separator dari mask opts
-  const gs = (window.__qtyMaskOpts?.groupSeparator ?? ',');
-  const rp = (window.__qtyMaskOpts?.radixPoint ?? '.');
-  let v = (el.value || '').trim();
-  if (!v) return NaN;
-  v = v.replace(new RegExp(escRe(gs), 'g'), ''); // hapus ribuan
-  v = v.replace(new RegExp(escRe(rp), 'g'), '.'); // jadikan '.' sebagai desimal
-  return parseFloat(v);
+/* ===============================
+   HELPERS
+================================*/
+function escRe(s){
+    return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 }
 
-// Set angka ke input (format 2 desimal & biar termask)
-function setNumeric(el, num) {
-  const str = (isFinite(num) ? Number(num).toFixed(window.QTY_DIGITS) : '');
-  if (el && el.inputmask && typeof el.inputmask.setValue === 'function') {
-    el.inputmask.setValue(str);
-  } else if (el) {
-    el.value = str;
-  }
-}
+function getNumeric(el){
+    if (!el) return NaN;
 
-// base price dari "Harga per Satuan" (juga termask)
-function findBasePrice(varId, unitId, pg) {
-  const gkey = (!pg || pg === 'default') ? 'default' : pg;
-  let el = document.querySelector(`input[name="unit_prices[${varId}][${unitId}][${gkey}]"]`);
-  if (!el && gkey !== 'default') {
-    el = document.querySelector(`input[name="unit_prices[${varId}][${unitId}][default]"]`);
-  }
-  return getNumeric(el);
-}
-
-/**
- * Recalc 1 baris.
- * @param {HTMLElement} row - <tr>
- * @param {boolean} roundNow - kalau true: format/set nilai final ke 2 desimal (akan memicu input); kalau false: hanya hitung & isi hidden.
- */
-function recalcRow(row, roundNow=false){
-  const fp = row.querySelector('.js-final-price');
-  if(!fp) return;
-
-  const varId = fp.dataset.var;
-  const unitId = fp.dataset.unit;
-  const pg     = fp.dataset.pg;
-
-  const base = findBasePrice(varId, unitId, pg);
-  const typeEl = row.querySelector('.js-discount-type');
-  const valEl  = row.querySelector('.js-discount-value');
-
-  if (!isFinite(base) || base <= 0) return;
-
-  // final dari input; bila kosong → hitung dari diskon tersimpan
-  let finalRaw = getNumeric(fp);
-  const dType = (typeEl?.value || 'fixed').toLowerCase();
-  const dVal  = parseFloat(valEl?.value || '0');
-
-  if (!isFinite(finalRaw)) {
-    // kosong → isi dari diskon tersimpan
-    let computed = dType === 'percent'
-      ? Math.max(0, base * (1 - (dVal/100)))
-      : Math.max(0, base - dVal);
-    if (roundNow) setNumeric(fp, computed); // hanya format saat init/blur/submit
-    finalRaw = computed;
-  } else {
-    // user sedang mengetik → jangan format saat input (hindari loop); format saat blur/submit
-    finalRaw = Math.max(0, finalRaw);
-    if (roundNow) setNumeric(fp, finalRaw);
-  }
-
-  // simpan sebagai DISKON FIXED = base - final
-  const disc = Math.max(0, base - finalRaw);
-  if (typeEl) typeEl.value = 'fixed';
-  if (valEl)  valEl.value  = disc.toFixed(window.QTY_DIGITS);
-}
-
-/* ===== Listeners ===== */
-
-// Saat user KETIK: hitung saja, tanpa format (roundNow=false)
-document.addEventListener('input', function(e){
-  if (!e.target.classList.contains('js-final-price')) return;
-  recalcRow(e.target.closest('tr'), /*roundNow=*/false);
-});
-
-// Saat user BLUR: baru format ke 2 desimal (roundNow=true)
-document.addEventListener('blur', function(e){
-  if (!e.target.classList.contains('js-final-price')) return;
-  recalcRow(e.target.closest('tr'), /*roundNow=*/true);
-}, true);
-
-// Ganti Price Group → kosongkan final dan hitung ulang (formatkan)
-document.addEventListener('change', function(e){
-  if (e.target.name && e.target.name.includes('[price_group_id]')){
-    const tr = e.target.closest('tr');
-    const fp = tr.querySelector('.js-final-price');
-    if (fp){
-      fp.dataset.pg = (e.target.value || '');
-      setNumeric(fp, NaN);      // kosongkan
-      recalcRow(tr, true);      // hitung & format
+    // inputmask support
+    if (el.inputmask){
+        const raw = el.inputmask.unmaskedvalue();
+        return raw === "" ? NaN : parseFloat(raw);
     }
-  }
+
+    let v = (el.value || "").trim();
+    if (!v) return NaN;
+
+    v = v.replace(new RegExp(escRe("{{ $thousand }}"), "g"), "");
+    v = v.replace(new RegExp(escRe("{{ $decimal }}"), "g"), ".");
+
+    return parseFloat(v);
+}
+
+function setNumeric(el, num){
+    const str = isFinite(num) ? Number(num).toFixed(window.QTY_DIGITS) : "";
+    if (el.inputmask) el.inputmask.setValue(str);
+    else el.value = str;
+}
+
+/* ===============================
+   FIND BASE PRICE
+================================*/
+function findBasePrice(varId, unitId, pg){
+    let key = pg || "default";
+
+    let selector =
+        `input[name^='unit_prices[${varId}][${unitId}]['][name$='[${key}]']`;
+
+    let el = document.querySelector(selector);
+
+    return getNumeric(el);
+}
+
+/* ===============================
+   DEBUG LOGGER (optional)
+================================*/
+window.DEBUG_QTY = false;
+function dbg(...a){
+    if (window.DEBUG_QTY){
+        console.log("[QTY DEBUG]", ...a);
+    }
+}
+
+/* ===============================
+   RECALC DISCOUNT
+================================*/
+function recalc(row, roundNow=false){
+    const fp = row.querySelector(".js-final-price");
+    const dVal = row.querySelector(".js-discount-value");
+
+    const pg     = row.querySelector(".js-pg").value || "default";
+    const varId  = fp.dataset.var;
+    const unitId = fp.dataset.unit;
+
+    dbg("=== RECALC START ===");
+    dbg("var =", varId, "unit =", unitId, "pg =", pg);
+
+    // Base price
+    let base = findBasePrice(varId, unitId, pg);
+    if (!isFinite(base)) base = 0;
+    dbg("Base =", base);
+
+    // Final price
+    let finalPrice = getNumeric(fp);
+    if (!isFinite(finalPrice)){
+        finalPrice = parseFloat(fp.dataset.lastValid || base);
+    } else {
+        fp.dataset.lastValid = finalPrice;
+    }
+    dbg("Final =", finalPrice);
+
+    if (roundNow){
+        setNumeric(fp, finalPrice);
+    }
+
+    // Discount
+    let discount = base - finalPrice;
+    if (!isFinite(discount) || discount < 0) discount = 0;
+
+    dVal.value = discount.toFixed(window.QTY_DIGITS);
+
+    dbg("Discount =", dVal.value);
+    dbg("=== RECALC END ===");
+}
+
+/* ===============================
+   INIT
+================================*/
+document.addEventListener("DOMContentLoaded", () => {
+
+    // Activate InputMask
+    if ($.fn.inputmask){
+        $(".input_number").inputmask(window.__qtyMaskOpts);
+    }
+
+    // Initial calculation
+    document.querySelectorAll("tbody[data-var][data-unit] tr")
+        .forEach(row => recalc(row, true));
 });
 
-// Sinkron sebelum submit (pastikan hidden discount sudah terisi & final terformat)
-const form = document.querySelector('form[action*="products/pricing/save"]');
-if (form) {
-  form.addEventListener('submit', function(){
-    document.querySelectorAll('tbody[data-var][data-unit] tr').forEach(function(tr){
-      recalcRow(tr, true);
-    });
-  });
-}
+/* ===============================
+   EVENTS
+================================*/
+document.addEventListener("input", e => {
+    if (e.target.classList.contains("js-final-price")){
+        recalc(e.target.closest("tr"), false);
+    }
+});
+
+document.addEventListener("change", e => {
+    if (e.target.classList.contains("js-pg") ||
+        e.target.classList.contains("js-loc"))
+    {
+        const row = e.target.closest("tr");
+
+        // Update data-pg attr
+        row.querySelector(".js-final-price").dataset.pg =
+            row.querySelector(".js-pg").value || "default";
+
+        recalc(row, true);
+    }
+});
+
+/* ===============================
+   BEFORE SUBMIT
+================================*/
+document.addEventListener("submit", () => {
+    document.querySelectorAll("tbody[data-var][data-unit] tr")
+        .forEach(row => recalc(row, true));
+}, true);
+document.addEventListener("click", e => {
+    if (!e.target.classList.contains("btn-add-tier")) return;
+
+    const varId  = e.target.dataset.var;
+    const unitId = e.target.dataset.unit;
+
+    const tbody = e.target.closest(".qty-card")
+        .querySelector(`tbody[data-var="${varId}"][data-unit="${unitId}"]`);
+
+    // Ambil index dari data-next
+    let nextIndex = parseInt(tbody.dataset.next || "0");
+
+    let html = `
+<tr>
+    <td>
+        <select class="form-control js-pg"
+                name="qty_rules[${varId}][${unitId}][${nextIndex}][price_group_id]">
+            <option value="">Default</option>
+            @foreach($price_groups as $pgid => $pgname)
+                <option value="{{ $pgid }}">{{ $pgname }}</option>
+            @endforeach
+        </select>
+    </td>
+
+    <td>
+        <input type="number" min="1" class="form-control js-minqty"
+               name="qty_rules[${varId}][${unitId}][${nextIndex}][min_qty]"
+               value="1" required>
+    </td>
+
+    <td>
+        <span class="js-base-label"></span>
+        <div class="input-group">
+            <span class="input-group-addon">IDR</span>
+            <input type="text" inputmode="decimal"
+                   class="form-control input_number js-final-price"
+                   name="qty_rules[${varId}][${unitId}][${nextIndex}][final_price_inc_tax]"
+                   data-var="${varId}" data-unit="${unitId}" data-pg="">
+        </div>
+        <input type="hidden" class="js-discount-type"
+               name="qty_rules[${varId}][${unitId}][${nextIndex}][discount_type]"
+               value="fixed">
+        <input type="hidden" class="js-discount-value"
+               name="qty_rules[${varId}][${unitId}][${nextIndex}][discount_value]"
+               value="0">
+    </td>
+
+    <td>
+        <select class="form-control js-loc" required
+                name="qty_rules[${varId}][${unitId}][${nextIndex}][location_id]">
+            <option disabled selected value="">Pilih Lokasi</option>
+            @foreach($business_locations as $lid => $lname)
+                <option value="{{ $lid }}">{{ $lname }}</option>
+            @endforeach
+        </select>
+    </td>
+
+    <td>
+        <div style="display:flex; gap:6px;">
+            <input type="date" class="form-control"
+                   name="qty_rules[${varId}][${unitId}][${nextIndex}][valid_from]">
+            <input type="date" class="form-control"
+                   name="qty_rules[${varId}][${unitId}][${nextIndex}][valid_to]">
+        </div>
+    </td>
+
+    <td class="text-center">
+        <button type="button" class="btn btn-danger btn-sm"
+                onclick="this.closest('tr').remove()">Hapus</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm duplicate-tier">×</button>
+    </td>
+</tr>`;
+
+    tbody.insertAdjacentHTML("beforeend", html);
+
+    // ACTIVATION INPUT MASK ONLY for last row
+    if ($.fn.inputmask) {
+        $(tbody).find("tr:last .input_number").inputmask(window.__qtyMaskOpts);
+    }
+
+    // increment counter
+    tbody.dataset.next = nextIndex + 1;
+});
 </script>
+
+
 

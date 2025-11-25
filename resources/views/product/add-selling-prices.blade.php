@@ -92,8 +92,129 @@
 	<form action="{{ route('products.pricing.save', $product->id) }}" method="POST">
   @csrf
 
-  {{-- Section: Harga per Satuan --}}
-  @include('product.partials.variation_unit_prices')   {{-- TANPA <form> di dalam file ini --}}
+<h5 class="tw-text-xl md:tw-text-2xl font-bold mb-3">
+    Harga per Satuan (Per Cabang)
+</h5>
+
+<style>
+    /* =============================================
+       FIX SPACE KOSONG BAWAAN TEMPLATE UltimatePOS
+       ============================================= */
+    section.content > .clearfix {
+        display: none !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* =============================================
+       TAB CONTENT (hilangkan min-height bawaan bootstrap 3 theme)
+       ============================================= */
+    .tab-content > .tab-pane {
+        min-height: 0 !important;
+        padding-top: 10px !important;
+    }
+
+    /* =============================================
+       TAB HEADER SCROLLABLE
+       ============================================= */
+    .horizontal-tabs-wrapper {
+        overflow-x: auto;
+        white-space: nowrap;
+        border-bottom: 1px solid #ddd;
+        margin-bottom: -1px; /* menyatukan border ke konten */
+    }
+
+    .nav-tabs .nav-link {
+        white-space: nowrap;
+        padding: 10px 16px;
+        font-weight: 600;
+        border-radius: 0 !important;
+    }
+
+    .nav-tabs .nav-link.active {
+        background: #fff !important;
+        border: 1px solid #ddd !important;
+        border-bottom-color: transparent !important;
+        color: #000 !important;
+    }
+
+    /* =============================================
+       TAB CONTENT PANEL
+       ============================================= */
+    .tab-content {
+        border: 1px solid #ddd;
+        border-top: none;
+        padding: 15px;
+        border-radius: 0 0 8px 8px;
+        background: #fff;
+    }
+</style>
+<style>
+/* 1 — Hapus jarak atas setelah tab */
+.tab-content {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* 2 — Hilangkan margin div pembungkus di dalam section.content */
+section.content > .row,
+section.content > .col-xs-12,
+section.content > .col-sm-12 {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* 3 — Border wrap tab harus langsung rapat tanpa gap */
+.tab-pane {
+    margin-top: 0 !important;
+    padding-top: 5px !important;
+}
+</style>
+<style>
+/* FIX BOOTSTRAP TAB GAP (UltimatePOS uses BS3) */
+.tab-content > .tab-pane {
+    display: none !important;
+}
+
+.tab-content > .active {
+    display: block !important;
+}
+</style>
+
+
+<div class="horizontal-tabs-wrapper">
+    <ul class="nav nav-tabs" style="display:flex; flex-wrap:nowrap; min-width:max-content;">
+        @foreach($business_locations as $locId => $locName)
+           <li class="{{ $loop->first ? 'active' : '' }}" style="flex:0 0 auto;">
+    <a data-toggle="tab"
+       href="#loc_{{ $locId }}">
+       {{ $locName }}
+    </a>
+</li>
+        @endforeach
+    </ul>
+</div>
+
+<div class="tab-content">
+    @foreach($business_locations as $locId => $locName)
+        <div class="tab-pane fade {{ $loop->first ? 'show active' : '' }}"
+             id="loc_{{ $locId }}">
+
+            @include('product.partials.variation_unit_prices', [
+                'location_id'            => $locId,
+                'unitPricesForLocation'  => $unitPricesGrouped[$locId] ?? collect(),
+                'price_groups_dropdown'  => $price_groups_dropdown,
+                'units_for_product'      => $units_for_product,
+                'product'                => $product,
+            ])
+
+        </div>
+    @endforeach
+</div>
+
+
 	<hr>
 <div style="margin-bottom: 16px"></div>
   {{-- Section: Diskon Qty per Satuan --}}
@@ -118,4 +239,21 @@
 			});
 		});
 	</script>
+
 @endsection --}}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    if (window.jQuery) {
+        $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+            $('.nav-tabs li').removeClass('active');
+            $(e.target).parent().addClass('active');
+        });
+    } else {
+        console.warn("jQuery belum siap");
+    }
+
+});
+</script>
+
+

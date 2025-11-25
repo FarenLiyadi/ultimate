@@ -1860,7 +1860,7 @@ $price_groups_dropdown = $price_groups->toArray(); // pluck('name','id') di atas
                  * @param  int  $id
                  * @return \Illuminate\Http\Response
                  */
- public function addSellingPrices($id)
+public function addSellingPrices($id)
 {
     if (! auth()->user()->can('product.update')) {
         abort(403, 'Unauthorized action.');
@@ -1877,13 +1877,12 @@ $price_groups_dropdown = $price_groups->toArray(); // pluck('name','id') di atas
         ])
         ->findOrFail($id);
 
-    /** MODUL LAMA */
-    // simpan sebagai COLLECTION untuk view lama
+    /** Harga Group Lama */
     $price_groups_collection = SellingPriceGroup::where('business_id', $business_id)
         ->active()
         ->get();
 
-    $price_groups = $price_groups_collection; // untuk table lama (pakai ->name, dll)
+    $price_groups = $price_groups_collection;
 
     $variation_prices = [];
     foreach ($product->variations as $variation) {
@@ -1895,9 +1894,14 @@ $price_groups_dropdown = $price_groups->toArray(); // pluck('name','id') di atas
         }
     }
 
-    /** MODUL BARU */
-    // units (base + sub) -> [unit_id => label]
-    $raw_units = app('App\Utils\ProductUtil')->getSubUnits($business_id, $product->unit_id, true);
+    /** Modul Baru */
+    $raw_units = app('App\Utils\ProductUtil')->getSubUnits(
+    $business_id,
+    $product->unit_id,
+    false,
+    $product->id   // <-- ini kuncinya
+);
+
     $units_for_product = collect($raw_units)->mapWithKeys(function ($u, $id) {
         if (is_array($u))        $label = $u['short_name'] ?? $u['name'] ?? (string)$id;
         elseif (is_object($u))   $label = $u->short_name ?? $u->name ?? (string)$id;
@@ -1905,22 +1909,31 @@ $price_groups_dropdown = $price_groups->toArray(); // pluck('name','id') di atas
         return [(int)$id => $label];
     })->toArray();
 
-    // array id=>name untuk partial baru
     $price_groups_dropdown = $price_groups_collection->pluck('name', 'id')->toArray();
 
-    // locations untuk tier qty (array [id => name])
     $business_locations = BusinessLocation::forDropdown($business_id);
 
-    // data existing
     $variation_ids = $product->variations->pluck('id')->all();
-    $unitPrices    = VariationUnitPrice::whereIn('variation_id', $variation_ids)->get();
-    $rules         = QtyPricingRule::whereIn('variation_id', $variation_ids)->get();
 
-   return view('product.add-selling-prices')->with(compact(
-    'product','price_groups','variation_prices',
-    'units_for_product','price_groups_dropdown','business_locations','unitPrices','rules'
-));
+    /** AMBIL SEMUA LOKASI — BUKAN 1 LOKASI */
+    $unitPricesGrouped = VariationUnitPrice::whereIn('variation_id', $variation_ids)
+        ->get()
+        ->groupBy('location_id');
+
+    $rules = QtyPricingRule::whereIn('variation_id', $variation_ids)->get();
+
+    return view('product.add-selling-prices')->with(compact(
+        'product',
+        'price_groups',
+        'variation_prices',
+        'units_for_product',
+        'price_groups_dropdown',
+        'business_locations',
+        'unitPricesGrouped',
+        'rules'
+    ));
 }
+
 
 
     /**

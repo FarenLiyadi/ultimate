@@ -16,11 +16,13 @@ return new class extends Migration
             $table->id();
             $table->unsignedInteger('variation_id');
             $table->unsignedInteger('unit_id');
+            $table->unsignedInteger('location_id')->nullable();
             $table->unsignedInteger('price_group_id')->nullable(); // NULL=Default
             $table->decimal('price_inc_tax', 15, 4)->nullable();      // simpan INC tax (gaya Ultimate POS)
             $table->timestamps();
 
-            $table->unique(['variation_id','unit_id','price_group_id'], 'uq_vuprice');
+            $table->unique(['location_id','variation_id','unit_id','price_group_id'], 'uq_vuprice');
+
             $table->foreign('variation_id')->references('id')->on('variations')->onDelete('cascade');
             $table->foreign('unit_id')->references('id')->on('units')->onDelete('cascade');
             $table->foreign('price_group_id')->references('id')->on('selling_price_groups')->onDelete('cascade');
