@@ -35,7 +35,18 @@
         <td>
             {!! Form::select('products[' . $row_index . '][price_group_id]', $price_groups, null, ['class' => 'form-control', 'placeholder' => __('lang_v1.none')]); !!}
         </td>
+           {{-- Tombol hapus row --}}
+    <td>
+        <button type="button" class="btn btn-sm btn-danger remove-row">
+            <i class="fa fa-trash"></i>
+        </button>
+    </td>
     </tr>
 @empty
 
 @endforelse
+<script>
+$(document).on("click", ".remove-row", function () {
+    $(this).closest("tr").remove();
+});
+</script>

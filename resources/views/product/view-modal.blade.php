@@ -181,69 +181,138 @@
     $existing_prices[$p->variation_id][$p->unit_id][$gkey] = (float)$p->price_inc_tax;
   }
 @endphp
-
+{{-- ===== Variation Unit Prices + Qty Prices per Location ===== --}}
 @if(!empty($product->variations))
-  <div class="row">
+
+<h4 class="m-t-20" style="font-weight:bold;">Harga Jual Per Cabang (Multi Satuan + Harga Qty)</h4>
+
+@foreach($business_locations as $locId => $locName)
+
+<div class="row" style="margin-top:25px; margin-bottom:10px;">
+
+    {{-- =======================
+          HEADER LOKASI
+    ======================== --}}
     <div class="col-md-12">
-      <h4 class="m-t-10">Harga Jual Satuan (Inc. Tax)</h4>
+        <h4 class="bg-green" 
+            style="padding:10px 14px; color:white; margin:0; border-radius:4px;">
+            <i class="fas fa-store"></i> {{ $locName }}
+        </h4>
     </div>
 
     @foreach($product->variations as $v)
-      <div class="col-md-12">
-        <div class="table-responsive">
-          <table class="table table-condensed table-bordered">
-            <thead>
-              <tr class="bg-green">
-                <th style="width:180px;">@lang('product.unit')</th>
-                <th style="width:160px;">Default</th>
-                @foreach(($price_groups_dropdown ?? []) as $pgid => $pgname)
-                  <th style="width:160px;">{{ $pgname }}</th>
-                @endforeach
-              </tr>
-            </thead>
-            <tbody>
-              @foreach(($units_for_product ?? []) as $uid => $uname)
-                @php
-                  // ambil default; kalau kosong & ini base unit → fallback ke sell_price_inc_tax (Edit Produk)
-                  $def = data_get($existing_prices, "{$v->id}.{$uid}.default");
-                  if ($def === null && (int)$uid === (int)$product->unit_id) {
-                      $def = (float)$v->sell_price_inc_tax;
-                  }
-                @endphp
-                <tr>
-                  <td><strong>{{ $uname }}</strong></td>
-                  <td>
-                    @if($def !== null)
-                      <span class="display_currency" data-currency_symbol="true">{{ $def }}</span>
-                    @else
-                      —
-                    @endif
-                  </td>
 
-                  @foreach(($price_groups_dropdown ?? []) as $pgid => $pgname)
-                    @php
-                      $g = data_get($existing_prices, "{$v->id}.{$uid}.{$pgid}");
-                      // fallback: jika group kosong → biarkan kosong (supaya jelas belum di-set)
-                    @endphp
-                    <td>
-                      @if($g !== null)
-                        <span class="display_currency" data-currency_symbol="true">{{ $g }}</span>
-                      @else
-                        —
-                      @endif
-                    </td>
-                  @endforeach
-                </tr>
-              @endforeach
-            </tbody>
-          </table>
+    <div class="col-md-12" 
+         style="border-left:3px solid #28a745; margin-top:20px; padding-left:15px;">
+
+        {{-- =======================
+             NAMA VARIASI
+        ======================== --}}
+       
+
+
+        {{-- ============================
+             TABEL HARGA MULTI UNIT
+        ============================= --}}
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead style="background:#f1f1f1;">
+                    <tr>
+                        <th style="width:180px;">Satuan</th>
+                        <th style="width:160px;">Harga Default</th>
+                        <th style="width:200px;">Group Harga</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($unitPrices->where('variation_id', $v->id)->where('location_id', $locId) as $up)
+                    <tr>
+                        <td>{{ $units_for_product[$up->unit_id] ?? $up->unit_id }}</td>
+
+                        <td>
+                            <span class="display_currency" data-currency_symbol="true">
+                                {{ $up->price_inc_tax }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <span class="label label-primary">
+                                {{ $price_groups_dropdown[$up->price_group_id] ?? 'Default' }}
+                            </span>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">
+                            <em>Tidak ada data harga multi-satuan untuk cabang ini.</em>
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
-      </div>
+
+
+        {{-- ======================================
+             TABEL HARGA QTY PER SATUAN (TIERS)
+        ======================================= --}}
+        <h5 style="margin-top:20px; font-weight:bold;">
+            <i class="fas fa-layer-group"></i> Harga Qty (Per Satuan)
+        </h5>
+
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead style="background:#f9f9f9;">
+                    <tr>
+                        <th style="width:180px;">Satuan</th>
+                        <th style="width:160px;">Price Group</th>
+                        <th style="width:120px;">Min Qty</th>
+                        <th style="width:180px;">Harga / Unit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($qtyRules->where('variation_id', $v->id)->where('location_id', $locId) as $qr)
+                    <tr>
+                        <td>{{ $units_for_product[$qr->unit_id] ?? $qr->unit_id }}</td>
+
+                        <td>
+                            <span class="label label-info">
+                                {{ $price_groups_dropdown[$qr->price_group_id] ?? 'Default' }}
+                            </span>
+                        </td>
+
+                        <td>{{ $qr->min_qty }}</td>
+
+                        <td>
+                            <span class="display_currency" data-currency_symbol="true">
+                                {{ $qr->final_price_inc_tax }}
+                            </span>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">
+                            <em>Tidak ada aturan harga qty untuk cabang ini.</em>
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+    </div> {{-- end each variation --}}
+
     @endforeach
-  </div>
+
+</div>
+
+@endforeach
+
 @endif
+
+
+
 {{-- ===== Qty Pricing Rules (Final price dihitung) ===== --}}
-@php
+{{-- @php
   // kelompokkan rules: [variation_id][unit_id] = list tier
   $rules_map = [];
   foreach (($qtyRules ?? []) as $r) {
@@ -341,7 +410,7 @@
       @endforeach
     @endforeach
   </div>
-@endif
+@endif --}}
 
 
 

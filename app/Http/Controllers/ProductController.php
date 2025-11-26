@@ -1731,6 +1731,37 @@ $unitPrices = VariationUnitPrice::whereIn('variation_id', $variation_ids)->get()
 // Qty Pricing Rules yang sudah tersimpan (urut rapi)
 $qtyRules = QtyPricingRule::whereIn('variation_id', $variation_ids)
     ->orderBy('unit_id')->orderBy('price_group_id')->orderBy('min_qty')->get();
+    // SUSUN existing_prices DULU
+$existing_prices = [];
+foreach ($unitPrices as $p) {
+    $gkey = $p->price_group_id ?? 'default';
+    $existing_prices[$p->variation_id][$p->unit_id][$gkey] = (float)$p->price_inc_tax;
+}
+
+
+    // === Hitung Final Price untuk setiap Qty Rule ===
+foreach ($qtyRules as $qr) {
+
+    // ambil base price
+    $pgKey = $qr->price_group_id ?? 'default';
+    $base = data_get($existing_prices,
+        "{$qr->variation_id}.{$qr->unit_id}.{$pgKey}"
+    );
+
+    // fallback base price
+    if ($base === null) {
+        $varObj = $product->variations->firstWhere('id', $qr->variation_id);
+        $base = $varObj ? (float)$varObj->sell_price_inc_tax : null;
+    }
+
+    // hitung final price
+    if ($qr->discount_type === 'percentage') {
+        $qr->final_price_inc_tax = max(0, $base * (1 - ($qr->discount_value / 100)));
+    } else {
+        // fixed
+        $qr->final_price_inc_tax = max(0, $base - $qr->discount_value);
+    }
+}
 
 // Locations untuk nama lokasi di tabel
 $business_locations = BusinessLocation::forDropdown($business_id);

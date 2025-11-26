@@ -1,129 +1,136 @@
-<table align="center" style="border-spacing: {{$barcode_details->col_distance * 1}}in {{$barcode_details->row_distance * 1}}in; overflow: hidden !important;">
+<style>
+body {
+    padding: 0;
+    margin: 0;
+    font-family: "Arial Black", Arial, Helvetica, sans-serif;
+    font-weight: bold;
+}
+
+table {
+    width: 71mm;
+    border-collapse: collapse;
+}
+
+td.label {
+    width: 33mm;
+    height: 15mm;
+    padding: 0;
+    margin: 0;
+    vertical-align: top;
+}
+
+td.gap {
+    width: 2mm;
+}
+
+.label-box {
+    width: 33mm;
+    height: 15mm;
+    padding: 1mm;
+    padding-left: 3mm;
+    padding-right: 2mm;
+    overflow: hidden;
+    font-size: 8px;
+    line-height: 1.05;
+}
+
+.product-name {
+    font-size: {{ $print['name_size'] + 1 }}px;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 0.5mm;
+}
+
+.price-text {
+    font-size: {{ $print['price_size'] + 1 }}px;
+    font-weight: bold;
+    margin-top: 1mm;
+}
+
+/* Barcode + SKU wrapper */
+.barcode-wrap {
+    width: 100%;
+    text-align: center; /* center seluruh isi */
+    margin-top: 1mm;
+}
+
+.barcode-img {
+    width: 80%;
+    height: 5mm;
+    display: block;
+    margin: 0 auto; /* center WITHOUT left offset */
+	margin-top: 2px;
+}
+
+.sku-text {
+    text-align: center;
+    font-size: 8px;
+    margin-top: 1px;
+    font-weight: bold;
+}
+</style>
+
+
+
+<table align="center">
 @foreach($page_products as $page_product)
 
-	@if($loop->index % $barcode_details->stickers_in_one_row == 0)
-		<!-- create a new row -->
-		<tr>
-		<!-- <columns column-count="{{$barcode_details->stickers_in_one_row}}" column-gap="{{$barcode_details->col_distance*1}}"> -->
-	@endif
-		<td align="center" valign="center">
-			<div style="overflow: hidden !important;display: flex; flex-wrap: wrap;align-content: center;width: {{$barcode_details->width * 1}}in; height: {{$barcode_details->height * 1}}in; justify-content: center;">
-				
+    @if($loop->index % 2 == 0)
+        <tr>
+    @endif
 
-				<div>
+    <td class="label">
+        <div class="label-box">
 
-					{{-- Business Name --}}
-					@if(!empty($print['business_name']))
-						<b style="display: block !important; font-size: {{$print['business_name_size']}}px">{{$business_name}}</b>
-					@endif
+            {{-- Nama Produk --}}
+            @if(!empty($print['name']))
+                <div class="product-name">
+                    {{ strtoupper(Str::limit($page_product->product_actual_name, 18, '...')) }}
+                </div>
+            @endif
 
-					{{-- Product Name --}}
-					@if(!empty($print['name']))
-						<span style="display: block !important; font-size: {{$print['name_size']}}px">
-							{{$page_product->product_actual_name}}
+            {{-- Harga --}}
+            @if(!empty($print['price']))
+                <div class="price-text">
+                    {{ session('currency')['symbol'] ?? '' }}
 
-							@if(!empty($print['lot_number']) && !empty($page_product->lot_number))
-								<span style="font-size: {{12*$factor}}px">
-									 ({{$page_product->lot_number}})
-								</span>
-							@endif
-						</span>
-					@endif
+                    @if($print['price_type'] == 'inclusive')
+                        {{ @num_format($page_product->sell_price_inc_tax) }}
+                    @else
+                        {{ @num_format($page_product->default_sell_price) }}
+                    @endif
+                </div>
+            @endif
 
-					{{-- Variation --}}
-					@if(!empty($print['variations']) && $page_product->is_dummy != 1)
-						<span style="display: block !important; font-size: {{$print['variations_size']}}px">
-							{{$page_product->product_variation_name}}:<b>{{$page_product->variation_name}}</b>
-						</span>
-					@endif
-					{{-- product_custom_fields --}}
-					@php
-						$custom_labels = json_decode(session('business.custom_labels'), true);
-						$product_custom_fields = !empty($custom_labels['product']) ? $custom_labels['product'] : [];
-					@endphp
+            {{-- Barcode --}}
+            <img class="barcode-img"
+                src="data:image/png;base64,{{ DNS1D::getBarcodePNG($page_product->sub_sku, $page_product->barcode_type, 1,40) }}">
 
-					@foreach($product_custom_fields as $index => $cf)
-						@php
-							$field_name = 'product_custom_field' . $loop->iteration;
-						@endphp
-						@if(!empty($cf) && !empty($page_product->$field_name ) && !empty($print[$field_name]))
-							<span style="font-size: {{ $print[$field_name . '_size'] }}px">
-								<b>{{ $cf }}:</b>
-								{{ $page_product->$field_name }}
-							</span>
-						@endif
-					@endforeach
-					<br>
+            {{-- SKU --}}
+            <div class="sku-text">
+                   {{ strtoupper(Str::limit($page_product->sub_sku, 18, '...')) }}
+            </div>
 
-					{{-- Price --}}
-					@if(!empty($print['price']))
-					<span style="font-size: {{$print['price_size']}}px;">
-						@lang('lang_v1.price'):
-						<b>{{session('currency')['symbol'] ?? ''}}
+        </div>
+    </td>
 
-						
-						@if($print['price_type'] == 'inclusive')
-							{{@num_format($page_product->sell_price_inc_tax)}}
-						@else
-							{{@num_format($page_product->default_sell_price)}}
-						@endif</b>
-					</span>
-					@endif
-					@if(!empty($print['exp_date']) && !empty($page_product->exp_date))
-						<br>
-						<span style="font-size: {{$print['exp_date_size']}}px">
-							<b>@lang('product.exp_date'):</b>
-							{{$page_product->exp_date}}
-						</span>
-						@if($barcode_details->is_continuous)
-						<br>
-						@endif
-					@endif
+    @if($loop->index % 2 == 0)
+        <td class="gap"></td>
+    @endif
 
-					@if(!empty($print['packing_date']) && !empty($page_product->packing_date))
-						<span style="font-size: {{$print['packing_date_size']}}px">
-							<b>@lang('lang_v1.packing_date'):</b>
-							{{$page_product->packing_date}}
-						</span>
-					@endif
-					{{-- Barcode --}}
-					<img style="max-width:90% !important;height: {{$barcode_details->height*0.24}}in !important; display: block;" src="data:image/png;base64,{{DNS1D::getBarcodePNG($page_product->sub_sku, $page_product->barcode_type, 3,90, array(0, 0, 0), false)}}">
-					
-					<span style="font-size: 10px !important">
-						{{$page_product->sub_sku}}
-					</span>
-				</div>
-			</div>
-		
-		</td>
+    @if($loop->iteration % 2 == 0)
+        </tr>
+    @endif
 
-	@if($loop->iteration % $barcode_details->stickers_in_one_row == 0)
-		</tr>
-	@endif
 @endforeach
 </table>
 
-<style type="text/css">
 
-	td{
-		border: 1px dotted lightgray;
-	}
-	@media print{
-		
-		table{
-			page-break-after: always;
-		}
-
-		
-		@page {
-		size: {{$paper_width}}in {{$paper_height}}in;
-
-		/*width: {{$barcode_details->paper_width}}in !important;*/
-		/*height:@if($barcode_details->paper_height != 0){{$barcode_details->paper_height}}in !important @else auto @endif;*/
-		margin-top: {{$margin_top}}in !important;
-		margin-bottom: {{$margin_top}}in !important;
-		margin-left: {{$margin_left}}in !important;
-		margin-right: {{$margin_left}}in !important;
-	}
-	}
+<style>
+@media print {
+    @page {
+        size: {{ $paper_width }}in {{ $paper_height }}in;
+        margin: {{ $margin_top }}in {{ $margin_left }}in;
+    }
+}
 </style>

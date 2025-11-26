@@ -2080,7 +2080,51 @@ if ($base_price_row) {
             'p.product_custom_field2',
             'p.product_custom_field3',
             'p.product_custom_field4'
-        )->groupBy('variations.id', 'vld.location_id');
+        );
+         /*
+    |--------------------------------------------------------------------------
+    |  ⭐ TAMBAHAN: HARGA JUAL PER CABANG (BASE UNIT)
+    |--------------------------------------------------------------------------
+    */
+    $products->addSelect(DB::raw("
+        (SELECT price_inc_tax
+         FROM variation_unit_prices 
+         WHERE variation_unit_prices.variation_id = variations.id
+           AND variation_unit_prices.unit_id = p.unit_id
+           AND (variation_unit_prices.location_id = vld.location_id 
+                OR variation_unit_prices.location_id IS NULL)
+         ORDER BY variation_unit_prices.location_id DESC
+         LIMIT 1
+        ) AS unit_price_branch
+    "));
+
+    /*
+    |--------------------------------------------------------------------------
+    | ⭐ TAMBAHAN: MULTI-SATUAN PER CABANG
+    |--------------------------------------------------------------------------
+    | Format output:
+    |   multiplier:UNIT:price
+    | Contoh:
+    |   1:Pcs:20000|12:Lusin:220000
+    */
+    $products->addSelect(DB::raw("
+        (SELECT GROUP_CONCAT(
+    CONCAT(
+        u.base_unit_multiplier, ':',
+        u.short_name, ':',
+        COALESCE(vup2.price_inc_tax, 0)
+    )
+    ORDER BY u.base_unit_multiplier ASC
+    SEPARATOR '|'
+)
+FROM variation_unit_prices vup2
+JOIN units u ON vup2.unit_id = u.id
+WHERE vup2.variation_id = variations.id
+  AND (vup2.location_id = vld.location_id OR vup2.location_id IS NULL)
+) AS multi_units_branch
+    "));
+
+    $products->groupBy('variations.id', 'vld.location_id');
 
         if (isset($filters['show_manufacturing_data']) && $filters['show_manufacturing_data']) {
             $pl_query_string = $this->get_pl_quantity_sum_string('PL');

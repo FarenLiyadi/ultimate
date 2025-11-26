@@ -33,8 +33,47 @@
                         		<span class="display_currency"data-currency_symbol=true >{{$product->unit_price ?? 0}}</span>
                         	</td>
 	            			<td>
-                        		<span data-is_quantity="true" class="display_currency"data-currency_symbol=false >{{$product->stock ?? 0}}</span>{{$product->unit}}
-                        	</td>
+    {{-- base stock --}}
+    @php
+        $stock = (float) ($product->stock ?? 0);
+    @endphp
+
+    <span data-is_quantity="true" class="display_currency" data-currency_symbol="false">
+        {{ $stock }}
+    </span> {{ $product->unit }}
+
+    {{-- MULTI UNITS --}}
+    @if(!empty($product->multi_units_branch))
+        @php
+            $rows = explode('|', $product->multi_units_branch);
+            $converted_units = [];
+        @endphp
+
+        @foreach($rows as $row)
+            @php
+                // format: multiplier:UNIT:PRICE
+                [$multiplier, $unit_name, $price] = explode(':', $row);
+
+                $multiplier = (float) $multiplier;
+
+                if($multiplier > 1){
+                    $qty = floor($stock / $multiplier);
+                    if($qty > 0){
+                        $converted_units[] = $qty . ' ' . $unit_name;
+                    }
+                }
+            @endphp
+        @endforeach
+
+        @if(!empty($converted_units))
+            <br>
+            <small class="text-muted">
+                ({{ implode(', ', $converted_units) }})
+            </small>
+        @endif
+    @endif
+</td>
+
                         	<td>
                         		<span class="display_currency"data-currency_symbol=true >{{$product->unit_price * $product->stock}}</span>
                         	</td>
