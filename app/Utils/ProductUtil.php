@@ -1039,13 +1039,13 @@ if ($base_price_row) {
             $variation_details->dpp_inc_tax = $this->calc_percentage($variation_details->default_purchase_price, $tax_rate, $variation_details->default_purchase_price);
 
             //Set default sell price inc. tax
-            $variation_details->sell_price_inc_tax = $variation_data['sell_price_inc_tax'];
+            // $variation_details->sell_price_inc_tax = $variation_data['sell_price_inc_tax'];
 
             //set sell price inc. tax
-            $variation_details->default_sell_price = $this->calc_percentage_base($variation_details->sell_price_inc_tax, $tax_rate);
+            // $variation_details->default_sell_price = $this->calc_percentage_base($variation_details->sell_price_inc_tax, $tax_rate);
 
             //set profit margin
-            $variation_details->profit_percent = $this->get_percent($variation_details->default_purchase_price, $variation_details->default_sell_price);
+            // $variation_details->profit_percent = $this->get_percent($variation_details->default_purchase_price, $variation_details->default_sell_price);
 
             $variation_details->save();
         }
@@ -1385,7 +1385,7 @@ if ($base_price_row) {
 
             $updated_purchase_lines[] = $purchase_line;
 
-            //Edit product price
+            // Edit product price
             if ($enable_product_editing == 1 && $transaction->type == 'purchase') {
                 if (isset($data['default_sell_price'])) {
                     $variation_data['sell_price_inc_tax'] = ($this->num_uf($data['default_sell_price'], $currency_details)) / $multiplier;

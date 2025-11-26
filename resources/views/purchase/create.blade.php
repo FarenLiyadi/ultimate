@@ -268,13 +268,13 @@
 								<th class="{{$hide_tax}}">@lang( 'purchase.product_tax' )</th>
 								<th class="{{$hide_tax}}">@lang( 'purchase.net_cost' )</th>
 								<th>@lang( 'purchase.line_total' )</th>
-								<th class="@if(!session('business.enable_editing_product_from_purchase')) hide @endif">
+								{{-- <th class="@if(!session('business.enable_editing_product_from_purchase')) hide @endif">
 									@lang( 'lang_v1.profit_margin' )
-								</th>
-								<th>
+								</th> --}}
+								{{-- <th>
 									@lang( 'purchase.unit_selling_price' )
 									<small>(@lang('product.inc_of_tax'))</small>
-								</th>
+								</th> --}}
 								@if(session('business.enable_lot_number'))
 									<th>
 										@lang('lang_v1.lot_number')

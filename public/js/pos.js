@@ -41,6 +41,7 @@ $(document).ready(function () {
         pos_form_obj = $('form#add_pos_sell_form');
     }
     if ($('form#edit_pos_sell_form').length > 0 || $('form#add_pos_sell_form').length > 0) {
+        // reset_pos_form();
         initialize_printer();
     }
 
@@ -649,6 +650,15 @@ $(document).ready(function () {
                 enable_pos_form_actions();
                 if (result.success == 1) {
                     reset_pos_form();
+                    // 🔥 Refresh suggestion list agar stok terbaru muncul
+                    $('input#suggestion_page').val(1);
+                    get_product_suggestion_list(
+                        global_p_category_id,
+                        global_brand_id,
+                        $('input#location_id').val()
+                    );
+                    get_featured_products();
+
                     toastr.success(result.msg);
                 } else {
                     toastr.error(result.msg);
@@ -684,6 +694,15 @@ $(document).ready(function () {
                 enable_pos_form_actions();
                 if (result.success == 1) {
                     reset_pos_form();
+                    // 🔥 Refresh suggestion list agar stok terbaru muncul
+                    $('input#suggestion_page').val(1);
+                    get_product_suggestion_list(
+                        global_p_category_id,
+                        global_brand_id,
+                        $('input#location_id').val()
+                    );
+                    get_featured_products();
+
                     toastr.success(result.msg);
 
                     //Check if enabled or not
@@ -940,6 +959,14 @@ $(document).ready(function () {
                             toastr.success(result.msg);
 
                             reset_pos_form();
+                            // 🔥 Refresh suggestion list agar stok terbaru muncul
+                            $('input#suggestion_page').val(1);
+                            get_product_suggestion_list(
+                                global_p_category_id,
+                                global_brand_id,
+                                $('input#location_id').val()
+                            );
+                            get_featured_products();
 
                             //Check if enabled or not
                             if (result.receipt.is_enabled) {
