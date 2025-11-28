@@ -12,16 +12,6 @@ $('#location_id').on('change', function () {
     CURRENT_LOCATION_ID = $(this).val();
 });
 
-// Update saat user pilih group harga
-$(document).on('change', '#price_group', function () {
-    CURRENT_PRICE_GROUP_ID = $(this).val();
-});
-
-// Update saat user pilih lokasi
-$(document).on('change', '#location_id', function () {
-    CURRENT_LOCATION_ID = $(this).val();
-});
-
 $(document).ready(function () {
     customer_set = false;
     //Prevent enter key function except texarea
@@ -49,13 +39,20 @@ $(document).ready(function () {
         reset_pos_form();
 
         var default_price_group = $(this).find(':selected').data('default_price_group');
+
+        // sinkronkan location
+        $('#location_id').val($(this).val());
+
+        // update global JS
+        CURRENT_LOCATION_ID = $(this).val();
         if (default_price_group) {
             if ($("#price_group option[value='" + default_price_group + "']").length > 0) {
                 $('#price_group').val(default_price_group);
                 $('#price_group').change();
             }
         }
-
+        // kalau ada default price group sekaligus, sekalian set global
+        CURRENT_PRICE_GROUP_ID = $('#price_group').val() || null;
         //Set default invoice scheme for location
         if ($('#invoice_scheme_id').length) {
             if ($('input[name="is_direct_sale"]').length > 0) {
@@ -1982,6 +1979,39 @@ function pos_each_row(row_obj) {
 
     __write_number(row_obj.find('input.item_tax'), unit_price_inc_tax - discounted_unit_price);
 }
+function pickUnitPrice(unit_prices, { variation_id, sub_unit_id, location_id, price_group_id }) {
+    if (!Array.isArray(unit_prices)) return null;
+
+    let candidates = unit_prices.filter(
+        (p) => parseInt(p.variation_id) === variation_id && parseInt(p.unit_id) === sub_unit_id
+    );
+
+    if (!candidates.length) return null;
+
+    // Prioritas 1: match lokasi + price group
+    let exact = candidates.find(
+        (p) => p.location_id == location_id && p.price_group_id == price_group_id
+    );
+    if (exact) return exact;
+
+    // Prioritas 2: lokasi match, group null
+    let locOnly = candidates.find((p) => p.location_id == location_id && p.price_group_id == null);
+    if (locOnly) return locOnly;
+
+    // Prioritas 3: lokasi null, group match
+    let pgOnly = candidates.find(
+        (p) => p.location_id == null && p.price_group_id == price_group_id
+    );
+    if (pgOnly) return pgOnly;
+
+    // Prioritas 4: totally global (null/null)
+    let global = candidates.find((p) => p.location_id == null && p.price_group_id == null);
+    if (global) return global;
+
+    // fallback: pertama saja
+    return candidates[0];
+}
+
 function applyAllPricing(tr) {
     // Jika user override harga, jangan sentuh
     if (tr.data('manual_price') == 1) return;
@@ -2005,13 +2035,12 @@ function applyAllPricing(tr) {
 
     let multi_price = null;
 
-    let match = unit_prices.find(
-        (p) =>
-            parseInt(p.variation_id) === variation_id &&
-            parseInt(p.unit_id) === sub_unit_id &&
-            (p.location_id == location_id || p.location_id === null) &&
-            (p.price_group_id == price_group_id || p.price_group_id === null)
-    );
+    let match = pickUnitPrice(unit_prices, {
+        variation_id,
+        sub_unit_id,
+        location_id,
+        price_group_id,
+    });
 
     if (match) {
         multi_price = parseFloat(match.price_inc_tax);
@@ -2029,6 +2058,7 @@ function applyAllPricing(tr) {
                 parseInt(r.variation_id) === variation_id &&
                 (r.price_group_id == price_group_id || r.price_group_id == null)
         )
+        .sort((a, b) => parseFloat(b.min_qty) - parseFloat(a.min_qty))
         .sort((a, b) => b.min_qty - a.min_qty)
         .find((r) => qty >= parseFloat(r.min_qty));
 
@@ -2692,12 +2722,12 @@ $('table#pos_table tbody').on('change', '.sub_unit', function () {
 });
 
 // setiap baris produk baru dimasukkan
-$(document).on('DOMNodeInserted', '#pos_table tbody', function (e) {
-    let row = $(e.target).closest('tr');
-    if (row && row.hasClass('product_row')) {
-        applyAllPricing(row);
-    }
-});
+// $(document).on('DOMNodeInserted', '#pos_table tbody', function (e) {
+//     let row = $(e.target).closest('tr');
+//     if (row && row.hasClass('product_row')) {
+//         applyAllPricing(row);
+//     }
+// });
 
 $(document).on('click', '#select_all_service_staff', function () {
     var val = $('#res_waiter_id').val();

@@ -530,6 +530,38 @@ public function getComboStockGlobal($variation_id)
 
         return true;
     }
+public function adjustProductQuantity($product_id, $variation_id, $location_id, $qty)
+{
+    $qty = floatval($qty);
+
+    $product = Product::find($product_id);
+
+    if ($product->enable_stock != 1) {
+        return true;
+    }
+
+    $details = VariationLocationDetails::firstOrCreate(
+        [
+            'variation_id' => $variation_id,
+            'product_id' => $product_id,
+            'location_id' => $location_id,
+        ],
+        [
+            'qty_available' => 0,
+            'product_variation_id' => Variation::find($variation_id)->product_variation_id,
+        ]
+    );
+
+    if ($qty < 0) {
+        // kurangi stok
+        $details->decrement('qty_available', abs($qty));
+    } else {
+        // tambah stok
+        $details->increment('qty_available', $qty);
+    }
+
+    return true;
+}
 
     /**
      * Decrease the product quantity of combo sub-products

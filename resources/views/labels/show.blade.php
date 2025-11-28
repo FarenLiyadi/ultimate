@@ -71,11 +71,11 @@
       							<div class="input-group-addon"><b>@lang( 'lang_v1.size' )</b></div>
 								<input type="text" class="form-control" 
 									name="print[name_size]" 
-									value="11">
+									value="10">
 							</div>
 						</td>
 
-						<td>
+						<td hidden>
 							<div class="checkbox">
 							    <label>
 							    	<input type="checkbox" checked name="print[variations]" value="1"> <b>@lang( 'barcode.print_variations' )</b>
@@ -86,7 +86,7 @@
       							<div class="input-group-addon"><b>@lang( 'lang_v1.size' )</b></div>
 								<input type="text" class="form-control" 
 									name="print[variations_size]" 
-									value="11">
+									value="10">
 							</div>
 						</td>
 
@@ -101,7 +101,7 @@
       							<div class="input-group-addon"><b>@lang( 'lang_v1.size' )</b></div>
 								<input type="text" class="form-control" 
 									name="print[price_size]" 
-									value="17">
+									value="10">
 							</div>
 
 						</td>
@@ -123,9 +123,9 @@
 						</td>
 					</tr>
 
-					<tr>
+					<tr hidden>
 						<td>
-							<div class="checkbox">
+							<div class="checkbox" >
 							    <label>
 							    	<input type="checkbox" checked name="print[business_name]" value="1"> <b>@lang( 'barcode.print_business_name' )</b>
 							    </label>

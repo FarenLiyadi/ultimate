@@ -79,7 +79,7 @@ include_once 'install_r.php';
 
 Route::middleware(['setData'])->group(function () {
     Route::get('/', function () {
-        return view('welcome');
+        return redirect('/login');
     });
 
     Auth::routes();
